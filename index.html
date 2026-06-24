@@ -4,16 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Templated Image Finder</title>
-<link rel="icon" type="Logo.png" href="Logo.png">
+    <link rel="icon" type="image/png" href="Logo.png">
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- React & ReactDOM -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     
-    <!-- Babel for in-browser JSX compilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
@@ -46,12 +43,6 @@
         );
         const LinkIcon = ({ size = 24, className = "" }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-        );
-        const AlertTriangle = ({ size = 24, className = "" }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
-        );
-        const CheckCircle = ({ size = 24, className = "" }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
         );
         const CopyPlus = ({ size = 24, className = "" }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="15" y1="12" x2="15" y2="18"/><line x1="12" y1="15" x2="18" y2="15"/><rect x="8" y="8" width="14" height="14" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
@@ -89,7 +80,6 @@
                                 <LinkIcon size={10} className="mr-1" /> View Image
                             </a>
                             
-                            {/* ONLY show the collapse button if there are multiple pages */}
                             {hasMultiple && (
                                 <button onClick={() => setExpanded(!expanded)} className="text-[11px] font-medium text-slate-400 hover:text-slate-200 flex items-center transition-colors focus:outline-none">
                                     <ChevronDown size={12} className={`mr-1 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
@@ -98,9 +88,8 @@
                             )}
                         </div>
                         
-                        {/* Always show if single link, otherwise show when expanded */}
                         {(!hasMultiple || expanded) && (
-                            <div className={`flex flex-col gap-1.5 mt-2 pt-2 ${hasMultiple ? 'border-t border-slate-800/60 animate-in fade-in slide-in-from-top-1 duration-200' : ''}`}>
+                            <div className={`flex flex-col gap-1.5 mt-2 pt-2 ${hasMultiple ? 'border-t border-slate-800/60' : ''}`}>
                                 {img.foundOn.map((pageUrl, idx) => {
                                     let displayPath = 'Homepage';
                                     try {
@@ -131,7 +120,6 @@
             const [error, setError] = useState('');
             const [results, setResults] = useState(null);
 
-            // Helper to extract a normalized filename from a URL
             const getFilename = (urlStr) => {
                 try {
                     const cleanUrl = urlStr.split('?')[0].split('#')[0];
@@ -140,15 +128,10 @@
                     
                     if (filename && filename.includes('.')) {
                         filename = decodeURIComponent(filename).trim();
-                        
-                        // Prevent redundant image tiles by aggressively stripping CDN resizing suffixes!
-                        // Groups variants (e.g. image-1920w.jpg, image-150x150.jpg) into one clean tile.
                         let prevFilename;
                         do {
                             prevFilename = filename;
-                            // Strip dimension suffixes like -150x150, _300x300, -1024xauto, -1920w, -1080h
                             filename = filename.replace(/[-_]\d+(?:x\d+|xauto|[wh])(?=\.[a-zA-Z0-9]+$)/i, '');
-                            // Strip typical builder descriptive suffixes like -mobile, -tablet, -opt, -thumb
                             filename = filename.replace(/[-_](?:mobile|tablet|desktop|thumb|thumbnail|small|medium|large|opt)(?=\.[a-zA-Z0-9]+$)/i, '');
                         } while (filename !== prevFilename);
 
@@ -160,37 +143,50 @@
                 }
             };
 
-            // Helper to fetch HTML through fallback proxies
+            // Enhanced proxy crawler with fixed syntax and an additional fallback tier
             const fetchProxy = async (finalUrl) => {
-                let htmlContent = '';
+                const encodedUrl = encodeURIComponent(finalUrl);
+                
+                // Proxy 1: AllOrigins
                 try {
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(finalUrl)}`;
-                const response = await fetch(proxyUrl);
-                if (!response.ok) throw new Error('Proxy 1 failed');
-                const data = await response.json();
-                if (!data.contents) throw new Error('Empty content');
-                htmlContent = data.contents;
-                } catch (err1) {
+                    const response = await fetch(`https://api.allorigins.win/get?url=${encodedUrl}`);
+                    if (!response.ok) throw new Error(`Status ${response.status}`);
+                    const data = await response.json();
+                    if (data.contents) return data.contents;
+                } catch (err) {
+                    console.warn("Proxy 1 (AllOrigins) failed:", err.message);
+                }
+
+                // Proxy 2: CodeTabs
                 try {
-                    const fallbackUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(finalUrl)}`;
-                    const response2 = await fetch(fallbackUrl);
-                    if (!response2.ok) throw new Error('Proxy 2 failed');
-                    htmlContent = await response2.text();
-                } catch (err2) {
-                    try {
-                    const finalProxyUrl = `https://corsproxy.io/?${encodeURIComponent(finalUrl)}`;
-                    const response3 = await fetch(finalProxyUrl);
-                    if (!response3.ok) throw new Error('Proxy 3 failed');
-                    htmlContent = await response3.text();
-                    } catch (err3) {
-                    throw new Error(`Failed to fetch ${finalUrl}. Please turn off your Adblocker/Shields for this page.`);
-                    }
+                    const response = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodedUrl}`);
+                    if (!response.ok) throw new Error(`Status ${response.status}`);
+                    return await response.text();
+                } catch (err) {
+                    console.warn("Proxy 2 (CodeTabs) failed:", err.message);
                 }
+
+                // Proxy 3: CorsProxy.io (Fixed structural query parameter)
+                try {
+                    const response = await fetch(`https://corsproxy.io/?url=${encodedUrl}`);
+                    if (!response.ok) throw new Error(`Status ${response.status}`);
+                    return await response.text();
+                } catch (err) {
+                    console.warn("Proxy 3 (CorsProxy.io) failed:", err.message);
                 }
-                return htmlContent;
+
+                // Proxy 4: Cors.eu.org (Fresh fallback tier)
+                try {
+                    const response = await fetch(`https://cors.eu.org/${finalUrl}`);
+                    if (!response.ok) throw new Error(`Status ${response.status}`);
+                    return await response.text();
+                } catch (err) {
+                    console.warn("Proxy 4 (Cors.eu.org) failed:", err.message);
+                }
+
+                throw new Error("All proxy attempts failed. Open public proxies might be rate-limited right now, or your browser's Adblocker/Shields are blocking the connections.");
             };
 
-            // Helper to process a single page's HTML to find images AND internal links
             const extractDataFromHtml = (htmlContent, currentUrl, startUrl) => {
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(htmlContent, 'text/html');
@@ -199,12 +195,9 @@
                 const internalLinks = [];
                 const startUrlObj = new URL(startUrl);
 
-                // PROCESS IMAGE HELPER
                 const processImageSrc = (src) => {
                     if (!src || src.startsWith('data:')) return;
-                    
-                    let cleanSrc = src;
-                    cleanSrc = cleanSrc.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
+                    let cleanSrc = src.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
                     
                     try {
                         const urlObj = new URL(cleanSrc, currentUrl);
@@ -217,11 +210,8 @@
                     }
                 };
 
-                // --- 1. EXTRACT LINKS & LIGHTBOX GALLERIES ---
                 const processHref = (href) => {
                     if (!href || href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('#')) return;
-                    
-                    // IF href is actually an image (Lightbox gallery popup link)
                     if (href.match(/\.(jpeg|jpg|gif|png|svg|webp)(?:\?.*)?$/i)) {
                         processImageSrc(href);
                         return;
@@ -242,17 +232,11 @@
                     } catch (e) {}
                 };
 
-                // Standard a-tag links
                 doc.querySelectorAll('a[href]').forEach(a => processHref(a.getAttribute('href')));
-
-                // Builder specific links (dropdowns, dead-link wrappers)
                 doc.querySelectorAll('[data-href], [data-url], [data-link]').forEach(el => {
                     processHref(el.getAttribute('data-href') || el.getAttribute('data-url') || el.getAttribute('data-link'));
                 });
 
-                // --- 2. EXTRACT IMAGES (Extremely Aggressive) ---
-                
-                // Standard & Lazy Loaded images
                 doc.querySelectorAll('img, source').forEach(img => {
                     const src = img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-original') || img.getAttribute('srcset');
                     if (src) {
@@ -261,13 +245,10 @@
                     }
                 });
 
-                // Scan EVERY attribute on EVERY element to prevent missing custom hidden images
                 doc.querySelectorAll('*').forEach(el => {
                     Array.from(el.attributes).forEach(attr => {
                         const val = attr.value;
                         if (!val) return;
-
-                        // Check if attribute contains an inline style/url format
                         if (val.includes('url(')) {
                             const urls = val.match(/url\(['"]?(.*?)['"]?\)/g);
                             if (urls) {
@@ -277,15 +258,12 @@
                                 });
                             }
                         }
-                        
-                        // Check if the attribute value IS literally an image URL
                         if (val.match(/\.(jpeg|jpg|gif|png|svg|webp)(?:\?.*)?$/i)) {
                             processImageSrc(val);
                         }
                     });
                 });
 
-                // Internal <style> tags
                 doc.querySelectorAll('style').forEach(styleTag => {
                     const cssText = styleTag.textContent;
                     if (cssText) {
@@ -301,7 +279,6 @@
                     }
                 });
 
-                // --- 3. BRUTE FORCE RAW HTML PARSE (For Javascript/JSON galleries & absolute/relative paths) ---
                 const rawUrlRegex = /(?:https?:\/\/|\/)[^\s"',;<>()[\]]+\.(?:jpg|jpeg|png|gif|webp|svg)(?:\?[^\s"',;<>()[\]]+)?/gi;
                 const rawMatches = htmlContent.match(rawUrlRegex);
                 if (rawMatches) {
@@ -311,9 +288,8 @@
                 return { images: imagesList, links: [...new Set(internalLinks)] };
             };
 
-            // FULL SITE CRAWLER: Uses a dynamic deep-dive queue to explore links found on subpages
             const crawlSiteAndExtractImages = async (startUrl, siteLabel) => {
-                let finalStartUrl = startUrl;
+                let finalStartUrl = startUrl.trim();
                 if (!/^https?:\/\//i.test(finalStartUrl)) {
                     finalStartUrl = 'https://' + finalStartUrl;
                 }
@@ -321,15 +297,12 @@
                 const allImages = [];
                 const visited = new Set();
                 const queue = [finalStartUrl];
-                const maxPages = 40; // Deep crawl limit
+                const maxPages = 40; 
                 const batchSize = 5;
-
                 const prioritizeKeywords = ['service', 'services', 'gallery', 'portfolio', 'about', 'our-work'];
 
-                // Continue scanning as long as there are pages in the queue (up to the limit)
                 while (queue.length > 0 && visited.size < maxPages) {
                     const currentBatch = [];
-                    // Take the next batch of unvisited pages
                     while (queue.length > 0 && currentBatch.length < batchSize && visited.size + currentBatch.length < maxPages) {
                         const url = queue.shift();
                         if (!visited.has(url)) {
@@ -339,10 +312,8 @@
                     }
 
                     if (currentBatch.length === 0) break;
-
                     setStatusText(`Scanning ${siteLabel}: Crawled ${visited.size} pages...`);
 
-                    // Fetch the batch of pages simultaneously
                     const batchPromises = currentBatch.map(async (url) => {
                         try {
                             const html = await fetchProxy(url);
@@ -354,10 +325,8 @@
 
                     const batchResults = await Promise.all(batchPromises);
 
-                    // Add extracted images and queue up newly discovered links
                     batchResults.forEach(({ images, links }) => {
                         allImages.push(...images);
-                        
                         links.forEach(link => {
                             if (!visited.has(link) && !queue.includes(link)) {
                                 queue.push(link);
@@ -365,21 +334,17 @@
                         });
                     });
 
-                    // Sort the queue to always prioritize scanning services & galleries first
                     queue.sort((a, b) => {
                         const aStr = a.toLowerCase();
                         const bStr = b.toLowerCase();
                         const aMatch = prioritizeKeywords.some(k => aStr.includes(k));
                         const bMatch = prioritizeKeywords.some(k => bStr.includes(k));
-                        
                         if (aMatch && !bMatch) return -1;
                         if (!aMatch && bMatch) return 1;
                         return 0;
                     });
                 }
 
-                // Group by filename and collect all unique URLs where the image was found
-                // Deduplicate based on the pathname so we don't get duplicate buttons for the exact same page
                 const imageMap = new Map();
                 allImages.forEach(item => {
                     let pathKey = 'Homepage';
@@ -404,16 +369,11 @@
                     }
                 });
 
-                const uniqueImages = Array.from(imageMap.values()).map(img => {
+                return Array.from(imageMap.values()).map(img => {
                     const foundUrls = Array.from(img.foundOnMap.values());
                     delete img.foundOnMap;
-                    return {
-                        ...img,
-                        foundOn: foundUrls
-                    };
+                    return { ...img, foundOn: foundUrls };
                 });
-                
-                return uniqueImages;
             };
 
             const handleScan = async (e) => {
@@ -429,6 +389,10 @@
 
                 try {
                     const builderImages = await crawlSiteAndExtractImages(builderUrl, 'Builder Site');
+                    if(builderImages.length === 0) {
+                        throw new Error("Could not pull data from the Builder Link. Try turning off adblockers or checking the URL.");
+                    }
+
                     const templateImages = await crawlSiteAndExtractImages(templateUrl, 'Template Site');
                     
                     setStatusText('Comparing filenames across all pages...');
@@ -445,8 +409,8 @@
                     });
 
                 } catch (err) {
-                    setError(err.message || 'An error occurred while scanning. Ensure adblockers are disabled for this site.');
-                } finally {
+                    setError(err.message || 'An error occurred while scanning.');
+                } {
                     setLoading(false);
                     setStatusText('');
                 }
@@ -454,201 +418,143 @@
 
             return (
                 <div className="min-h-screen font-sans p-6">
-                <div className="max-w-4xl mx-auto space-y-8">
-                    
-                    {/* Header Section */}
-                    <div className="bg-[#151c2c] rounded-2xl shadow-2xl border border-slate-800/60 p-8 relative overflow-hidden">
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-24 bg-cyan-500/10 blur-[60px] pointer-events-none"></div>
-
-                    <div className="flex flex-col items-center text-center mb-8 relative z-10">
-                        <div className="p-3 bg-cyan-400/10 text-cyan-400 rounded-xl shadow-[0_0_20px_rgba(34,211,238,0.2)] mb-4 border border-cyan-400/20">
-                        <ImageIcon size={28} />
-                        </div>
-                        <h1 className="text-3xl font-bold text-white mb-2">Templated Image Finder</h1>
-                        <p className="text-slate-400 max-w-2xl text-sm">
-                        Fast scan to compare all pages, standard images, background images, and hidden galleries. Made by JSB
-                        </p>
-                    </div>
-
-                    {/* Form */}
-                    <form onSubmit={handleScan} className="mt-8 space-y-6 relative z-10">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <label className="block text-sm font-medium text-slate-300">Builder Link</label>
-                            <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <LinkIcon size={16} className="text-slate-500" />
-                            </div>
-                            <input
-                                type="text"
-                                value={builderUrl}
-                                onChange={(e) => setBuilderUrl(e.target.value)}
-                                placeholder="Paste the builder link here..."
-                                className="pl-10 w-full rounded-xl bg-[#0f1524] border border-slate-700/50 px-4 py-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all outline-none"
-                                required
-                            />
-                            </div>
-                        </div>
+                    <div className="max-w-4xl mx-auto space-y-8">
                         
-                        <div className="space-y-2">
-                            <label className="block text-sm font-medium text-slate-300">Template Link</label>
-                            <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <LinkIcon size={16} className="text-slate-500" />
+                        {/* Header Section */}
+                        <div className="bg-[#151c2c] rounded-2xl shadow-2xl border border-slate-800/60 p-8 relative overflow-hidden">
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-24 bg-cyan-500/10 blur-[60px] pointer-events-none"></div>
+
+                            <div className="flex flex-col items-center text-center mb-8 relative z-10">
+                                <div className="p-3 bg-cyan-400/10 text-cyan-400 rounded-xl shadow-[0_0_20px_rgba(34,211,238,0.2)] mb-4 border border-cyan-400/20">
+                                    <ImageIcon size={28} />
+                                </div>
+                                <h1 className="text-3xl font-bold text-white mb-2">Templated Image Finder</h1>
+                                <p className="text-slate-400 max-w-2xl text-sm">
+                                    Fast scan to compare all pages, standard images, background images, and hidden galleries. Made by JSB
+                                </p>
                             </div>
-                            <input
-                                type="text"
-                                value={templateUrl}
-                                onChange={(e) => setTemplateUrl(e.target.value)}
-                                placeholder="Paste the template link here..."
-                                className="pl-10 w-full rounded-xl bg-[#0f1524] border border-slate-700/50 px-4 py-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all outline-none"
-                                required
-                            />
-                            </div>
-                        </div>
+
+                            {/* Form */}
+                            <form onSubmit={handleScan} className="mt-8 space-y-6 relative z-10">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="block text-sm font-medium text-slate-300">Builder Link</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <LinkIcon size={16} className="text-slate-500" />
+                                            </div>
+                                            <input
+                                                type="text"
+                                                value={builderUrl}
+                                                onChange={(e) => setBuilderUrl(e.target.value)}
+                                                placeholder="Paste the builder link here..."
+                                                className="pl-10 w-full rounded-xl bg-[#0f1524] border border-slate-700/50 px-4 py-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all outline-none"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-2">
+                                        <label className="block text-sm font-medium text-slate-300">Template Link</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <LinkIcon size={16} className="text-slate-500" />
+                                            </div>
+                                            <input
+                                                type="text"
+                                                value={templateUrl}
+                                                onChange={(e) => setTemplateUrl(e.target.value)}
+                                                placeholder="Paste the template link here..."
+                                                className="pl-10 w-full rounded-xl bg-[#0f1524] border border-slate-700/50 px-4 py-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all outline-none"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {error && (
+                                    <div className="p-4 bg-red-950/30 border border-red-900/50 text-red-400 rounded-xl flex items-start space-x-3">
+                                        <AlertCircle size={20} className="mt-0.5 flex-shrink-0" />
+                                        <p className="text-sm">{error}</p>
+                                    </div>
+                                )}
+
+                                <div className="flex flex-col md:flex-row items-center gap-4 pt-2">
+                                    <button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="w-full md:w-auto px-8 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-medium rounded-xl shadow-[0_0_15px_rgba(8,145,178,0.3)] transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:bg-slate-800 disabled:text-slate-400 disabled:shadow-none disabled:cursor-not-allowed"
+                                    >
+                                        {loading ? (
+                                            <React.Fragment>
+                                                <Loader2 size={18} className="animate-spin" />
+                                                <span>Fast Scanning...</span>
+                                            </React.Fragment>
+                                        ) : (
+                                            <React.Fragment>
+                                                <Search size={18} />
+                                                <span>Find Templated Images</span>
+                                            </React.Fragment>
+                                        )}
+                                    </button>
+                                    
+                                    {statusText && (
+                                        <div className="flex items-center space-x-2 text-sm font-medium text-cyan-400 bg-cyan-950/30 px-4 py-3 rounded-xl animate-pulse border border-cyan-900/50">
+                                            <Loader2 size={16} className="animate-spin" />
+                                            <span>{statusText}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </form>
                         </div>
 
-                        {error && (
-                        <div className="p-4 bg-red-950/30 border border-red-900/50 text-red-400 rounded-xl flex items-start space-x-3">
-                            <AlertCircle size={20} className="mt-0.5 flex-shrink-0" />
-                            <p className="text-sm">{error}</p>
-                        </div>
+                        {/* Focused Results Section */}
+                        {results && (
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
+                                    <div className="p-4 bg-[#151c2c] rounded-xl border border-slate-800">
+                                        <p className="text-sm text-slate-400">Templated Stock Images Found</p>
+                                        <p className="text-2xl font-bold text-red-400">{results.templated.length}</p>
+                                    </div>
+                                    <div className="p-4 bg-[#151c2c] rounded-xl border border-slate-800">
+                                        <p className="text-sm text-slate-400">Unique Custom Images Found</p>
+                                        <p className="text-2xl font-bold text-emerald-400">{results.uniqueToBuilder.length}</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-3">
+                                        <h3 className="text-lg font-bold text-red-400 px-1">Templated (Must Replace)</h3>
+                                        <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scroll pr-1">
+                                            {results.templated.length === 0 ? (
+                                                <p className="text-sm text-slate-500 italic p-3">No template matches left! Clean build.</p>
+                                            ) : (
+                                                results.templated.map((img, i) => <ImageCard key={i} img={img} isTemplated={true} />)
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <h3 className="text-lg font-bold text-emerald-400 px-1">Unique Builder Images</h3>
+                                        <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scroll pr-1">
+                                            {results.uniqueToBuilder.length === 0 ? (
+                                                <p className="text-sm text-slate-500 italic p-3">No unique images found.</p>
+                                            ) : (
+                                                results.uniqueToBuilder.map((img, i) => <ImageCard key={i} img={img} isTemplated={false} />)
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         )}
 
-                        <div className="flex flex-col md:flex-row items-center gap-4 pt-2">
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full md:w-auto px-8 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-medium rounded-xl shadow-[0_0_15px_rgba(8,145,178,0.3)] transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:bg-slate-800 disabled:text-slate-400 disabled:shadow-none disabled:cursor-not-allowed"
-                        >
-                            {loading ? (
-                            <React.Fragment>
-                                <Loader2 size={18} className="animate-spin" />
-                                <span>Fast Scanning...</span>
-                            </React.Fragment>
-                            ) : (
-                            <React.Fragment>
-                                <Search size={18} />
-                                <span>Find Templated Images</span>
-                            </React.Fragment>
-                            )}
-                        </button>
-                        
-                        {/* Live Status Indicator */}
-                        {statusText && (
-                            <div className="flex items-center space-x-2 text-sm font-medium text-cyan-400 bg-cyan-950/30 px-4 py-3 rounded-xl animate-pulse border border-cyan-900/50">
-                            <Loader2 size={16} className="animate-spin" />
-                            <span>{statusText}</span>
-                            </div>
-                        )}
-                        </div>
-                    </form>
                     </div>
-
-                    {/* Focused Results Section */}
-                    {results && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        
-                        {/* KPI Cards */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="bg-[#151c2c] p-5 rounded-2xl border border-red-900/30 flex flex-col justify-center items-center text-center shadow-lg relative overflow-hidden group">
-                            <div className="absolute inset-0 bg-gradient-to-b from-red-500/5 to-transparent pointer-events-none"></div>
-                            <p className="text-[11px] text-red-400/80 font-bold uppercase tracking-wider mb-1 relative z-10">Templated</p>
-                            <span className="text-4xl font-black text-red-500 relative z-10">{results.templated.length}</span>
-                            <p className="text-[10px] text-red-500/60 mt-1 relative z-10">To replace</p>
-                        </div>
-                        
-                        <div className="bg-[#151c2c] p-5 rounded-2xl border border-emerald-900/30 flex flex-col justify-center items-center text-center shadow-lg relative overflow-hidden">
-                            <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent pointer-events-none"></div>
-                            <p className="text-[11px] text-emerald-400/80 font-bold uppercase tracking-wider mb-1 relative z-10">Custom</p>
-                            <span className="text-4xl font-black text-emerald-500 relative z-10">{results.uniqueToBuilder.length}</span>
-                            <p className="text-[10px] text-emerald-500/60 mt-1 relative z-10">Not templated</p>
-                        </div>
-
-                        <div className="bg-[#151c2c] p-5 rounded-2xl border border-slate-800 flex flex-col justify-center items-center text-center shadow-lg">
-                            <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wider mb-1">Builder Total</p>
-                            <span className="text-4xl font-black text-white">{results.builderCount}</span>
-                            <p className="text-[10px] text-slate-500 mt-1">Images scanned</p>
-                        </div>
-
-                        <div className="bg-[#151c2c] p-5 rounded-2xl border border-slate-800 flex flex-col justify-center items-center text-center shadow-lg">
-                            <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wider mb-1">Template Total</p>
-                            <span className="text-4xl font-black text-white">{results.templateCount}</span>
-                            <p className="text-[10px] text-slate-500 mt-1">Images scanned</p>
-                        </div>
-                        </div>
-
-                        {/* Split Lists: Templated vs Custom */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        
-                        {/* Templated Images List (RED) */}
-                        <div className="bg-[#151c2c] rounded-2xl shadow-xl border border-slate-800 overflow-hidden flex flex-col">
-                            <div className="bg-[#0f1524] p-4 border-b border-slate-800/60 flex items-center justify-between">
-                            <h3 className="font-semibold text-slate-200 flex items-center text-sm">
-                                <ImageIcon size={16} className="mr-2 text-red-500" /> 
-                                Templated Images
-                            </h3>
-                            <span className="px-2.5 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded-full text-xs font-bold shadow-sm">
-                                {results.templated.length}
-                            </span>
-                            </div>
-                            
-                            <div className="p-4 max-h-[700px] overflow-y-auto bg-[#0B1120] flex-1 custom-scroll">
-                            {results.templated.length === 0 ? (
-                                <div className="text-center py-12 bg-[#151c2c] rounded-xl border border-dashed border-slate-700">
-                                <CheckCircle size={36} className="mx-auto text-emerald-500 mb-3 opacity-80" />
-                                <h4 className="text-sm font-bold text-slate-200">Site is fully custom!</h4>
-                                <p className="text-xs text-slate-500 mt-1">No matching filenames found.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                {results.templated.map((img, i) => (
-                                    <ImageCard key={i} img={img} isTemplated={true} />
-                                ))}
-                                </div>
-                            )}
-                            </div>
-                        </div>
-
-                        {/* Custom Images List (GREEN) */}
-                        <div className="bg-[#151c2c] rounded-2xl shadow-xl border border-slate-800 overflow-hidden flex flex-col">
-                            <div className="bg-[#0f1524] p-4 border-b border-slate-800/60 flex items-center justify-between">
-                            <h3 className="font-semibold text-slate-200 flex items-center text-sm">
-                                <CheckCircle size={16} className="mr-2 text-emerald-500" /> 
-                                Custom Images
-                            </h3>
-                            <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-xs font-bold shadow-sm">
-                                {results.uniqueToBuilder.length}
-                            </span>
-                            </div>
-                            
-                            <div className="p-4 max-h-[700px] overflow-y-auto bg-[#0B1120] flex-1 custom-scroll">
-                            {results.uniqueToBuilder.length === 0 ? (
-                                <div className="text-center py-12 bg-[#151c2c] rounded-xl border border-dashed border-slate-700">
-                                <AlertTriangle size={36} className="mx-auto text-yellow-500 mb-3 opacity-80" />
-                                <h4 className="text-sm font-bold text-slate-200">No custom images</h4>
-                                <p className="text-xs text-slate-500 mt-1">All images appear to be from the template.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                {results.uniqueToBuilder.map((img, i) => (
-                                    <ImageCard key={i} img={img} isTemplated={false} />
-                                ))}
-                                </div>
-                            )}
-                            </div>
-                        </div>
-
-                        </div>
-                    </div>
-                    )}
-
-                </div>
                 </div>
             );
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
         root.render(<App />);
     </script>
 </body>
