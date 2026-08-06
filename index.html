@@ -3,653 +3,857 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Templated Image Finder</title>
-<link rel="icon" type="Logo.png" href="Logo.png">
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- React & ReactDOM -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    
-    <!-- Babel for in-browser JSX compilation -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
+    <title>SLA vs Freshdesk Comparator</title>
     <style>
-        /* Custom scrollbar for dark mode */
-        .custom-scroll::-webkit-scrollbar { width: 8px; }
-        .custom-scroll::-webkit-scrollbar-track { background: #0B1120; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 9999px; }
-        .custom-scroll:hover::-webkit-scrollbar-thumb { background: #334155; }
+        :root {
+            --bg-color: #f3f4f6;
+            --surface-color: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --border-color: #e5e7eb;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --success: #10b981;
+            --success-bg: #d1fae5;
+            --danger: #ef4444;
+            --danger-bg: #fee2e2;
+            --warning: #f59e0b;
+            --warning-bg: #fef3c7;
+            --radius: 0.5rem;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #111827;
+            --surface-color: #1f2937;
+            --text-main: #f9fafb;
+            --text-muted: #9ca3af;
+            --border-color: #374151;
+            --primary: #3b82f6;
+            --primary-hover: #60a5fa;
+            --success: #34d399;
+            --success-bg: rgba(16, 185, 129, 0.2);
+            --danger: #f87171;
+            --danger-bg: rgba(239, 68, 68, 0.2);
+            --warning: #fbbf24;
+            --warning-bg: rgba(245, 158, 11, 0.2);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            transition: background-color 0.3s, color 0.3s;
+            line-height: 1.5;
+            padding: 1.5rem;
+        }
+
+        h1, h2, h3 { font-weight: 600; }
+        
+        button {
+            cursor: pointer;
+            font-family: inherit;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--surface-color);
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+
+        .theme-toggle {
+            background: var(--border-color);
+            color: var(--text-main);
+            padding: 0.5rem 1rem;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .grid-2 { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--surface-color);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        textarea {
+            width: 100%;
+            height: 250px;
+            background: var(--bg-color);
+            color: var(--text-main);
+            border: 2px dashed var(--border-color);
+            border-radius: var(--radius);
+            padding: 1rem;
+            font-family: monospace;
+            resize: vertical;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        textarea.dragover {
+            background-color: rgba(59, 130, 246, 0.1);
+            border-color: var(--primary);
+        }
+
+        .controls-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+            background: var(--surface-color);
+            padding: 1.5rem;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+
+        select, input[type="text"] {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            background: var(--bg-color);
+            color: var(--text-main);
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            padding: 0.5rem 1.5rem;
+            font-size: 1rem;
+        }
+
+        .btn-primary:hover { background: var(--primary-hover); }
+
+        .search-box {
+            flex-grow: 1;
+            min-width: 200px;
+        }
+
+        .summary-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            position: sticky;
+            top: 1rem;
+            z-index: 10;
+        }
+
+        .stat-card {
+            background: var(--surface-color);
+            padding: 1rem;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-card p {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        
+        .stat-card.blue { border-left: 4px solid var(--primary); }
+        .stat-card.green { border-left: 4px solid var(--success); }
+        .stat-card.red { border-left: 4px solid var(--danger); }
+        .stat-card.orange { border-left: 4px solid var(--warning); }
+
+        .warning-box {
+            background: var(--warning-bg);
+            border-left: 4px solid var(--warning);
+            padding: 1rem;
+            border-radius: var(--radius);
+            margin-bottom: 1.5rem;
+        }
+        .warning-box h4 { color: var(--warning); margin-bottom: 0.5rem; }
+        .warning-box ul { margin-left: 1.5rem; font-size: 0.9rem; }
+
+        .hidden { display: none !important; }
+
+        .results-section {
+            background: var(--surface-color);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            background: var(--bg-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .results-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 0.25rem 0.75rem;
+        }
+        .btn-outline:hover { background: var(--bg-color); }
+
+        .table-responsive {
+            overflow-x: auto;
+            max-height: 400px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            background: var(--bg-color);
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        td {
+            padding: 0.75rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        tr:hover { background-color: rgba(0, 0, 0, 0.02); }
+        [data-theme="dark"] tr:hover { background-color: rgba(255, 255, 255, 0.02); }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-success { background: var(--success-bg); color: var(--success); }
+        .badge-danger { background: var(--danger-bg); color: var(--danger); }
+        
+        .text-red { color: var(--danger); font-weight: bold; }
+
+        .loader {
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 2rem auto;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
-<body class="bg-[#0B1120] text-slate-300 selection:bg-cyan-500/30 selection:text-cyan-100 antialiased">
-    
-    <div id="root"></div>
+<body data-theme="dark">
 
-    <script type="text/babel">
-        const { useState } = React;
+    <div class="container">
+        <header class="header">
+            <h1>📊 Data Comparator</h1>
+            <button class="theme-toggle" id="themeBtn">☀️ Light Mode</button>
+        </header>
 
-        // --- Inline SVG Icons ---
-        const Search = ({ size = 24, className = "" }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        );
-        const ImageIcon = ({ size = 24, className = "" }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.08-3.08a1.2 1.2 0 0 0-1.72 0l-1.81 1.81L12.92 11a1.2 1.2 0 0 0-1.72 0l-8.2 8.19"/></svg>
-        );
-        const AlertCircle = ({ size = 24, className = "" }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
-        );
-        const Loader2 = ({ size = 24, className = "" }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`animate-spin ${className}`}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-        );
-        const LinkIcon = ({ size = 24, className = "" }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-        );
-        const AlertTriangle = ({ size = 24, className = "" }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
-        );
-        const CheckCircle = ({ size = 24, className = "" }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
-        );
-        const CopyPlus = ({ size = 24, className = "" }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="15" y1="12" x2="15" y2="18"/><line x1="12" y1="15" x2="18" y2="15"/><rect x="8" y="8" width="14" height="14" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-        );
-        const ChevronDown = ({ size = 24, className = "" }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 9 6 6 6-6"/></svg>
-        );
+        <section class="grid-2">
+            <div class="card input-group">
+                <label for="slaInput">SLA Data (Page Count & GPID)</label>
+                <textarea id="slaInput" placeholder="Paste SLA data here...&#10;Or drag and drop a TXT/CSV file.&#10;&#10;Format:&#10;28    TI BLUEGR019&#10;21    TI TOTALR014"></textarea>
+            </div>
+            <div class="card input-group">
+                <label for="fdInput">Freshdesk Data (Page Count & GPID)</label>
+                <textarea id="fdInput" placeholder="Paste Freshdesk data here...&#10;Or drag and drop a TXT/CSV file.&#10;&#10;Format:&#10;28    TI BLUEGR019&#10;21    TI TOTALR014"></textarea>
+            </div>
+        </section>
 
-        // --- Collapsible Image Card Component ---
-        const ImageCard = ({ img, isTemplated }) => {
-            const [expanded, setExpanded] = useState(false);
-            const hasMultiple = img.foundOn.length > 1;
+        <section class="controls-row">
+            <div>
+                <label style="font-weight:600; margin-right:0.5rem;">Mode:</label>
+                <select id="compareMode">
+                    <option value="newBuild">New Build (Strict Page Count)</option>
+                    <option value="siteEdit">Site Edit (Ignore Page Count)</option>
+                </select>
+            </div>
+            <button id="compareBtn" class="btn-primary">▶ Compare Data</button>
+            <input type="text" id="searchInput" class="search-box" placeholder="🔍 Search by GPID across all results...">
+            <button id="exportAllBtn" class="btn-primary hidden">📥 Export All CSV</button>
+        </section>
 
-            return (
-                <div className={`flex items-start space-x-4 p-3 bg-[#151c2c] rounded-xl border border-slate-800 shadow-sm transition-all relative ${isTemplated ? 'hover:border-red-500/40' : 'hover:border-emerald-500/40'}`}>
-                    
-                    {/* Duplication Indicator Badge */}
-                    {hasMultiple && (
-                        <div className="absolute -top-2 -right-2 bg-yellow-500/90 text-yellow-950 px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md flex items-center border border-yellow-400 z-10">
-                            <CopyPlus size={10} className="mr-1" />
-                            Used on {img.foundOn.length} pages
-                        </div>
-                    )}
+        <div id="loader" class="loader hidden"></div>
 
-                    <div className="w-14 h-14 flex-shrink-0 bg-[#0f1524] rounded-lg overflow-hidden flex items-center justify-center border border-slate-800/60 mt-1">
-                        <img src={img.src} alt={img.filename} className="w-full h-full object-cover opacity-90" onError={(e) => { e.target.onerror = null; e.target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5Y2EzYWYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cmVjdCB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHg9IjMiIHk9IjMiIHJ4PSIyIiByeT0iMiIvPjxjaXJjbGUgY3g9IjkiIGN5PSI5IiByPSIyIi8+PHBhdGggZD0ibTIxIDE1LTMuMDgtMy4wOGExLjIgMS4yIDAgMCAwLTEuNzIgMGwtMS44MSAxLjgxTDEyLjkyIDExYTEuMiAxLjIgMCAwIDAtMS43MiAwbC04LjIgOC4xOSIvPjwvc3ZnPg=='}} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-200 truncate" title={img.filename}>
-                        {img.filename}
-                        </p>
-                        
-                        <div className="flex items-center space-x-4 mt-0.5 mb-1">
-                            <a href={img.src} target="_blank" rel="noreferrer" className={`text-[11px] font-medium flex items-center transition-colors ${isTemplated ? 'text-red-400 hover:text-red-300' : 'text-emerald-400 hover:text-emerald-300'}`}>
-                                <LinkIcon size={10} className="mr-1" /> View Image
-                            </a>
-                            
-                            {/* ONLY show the collapse button if there are multiple pages */}
-                            {hasMultiple && (
-                                <button onClick={() => setExpanded(!expanded)} className="text-[11px] font-medium text-slate-400 hover:text-slate-200 flex items-center transition-colors focus:outline-none">
-                                    <ChevronDown size={12} className={`mr-1 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
-                                    {expanded ? 'Hide pages' : `${img.foundOn.length} pages`}
-                                </button>
-                            )}
-                        </div>
-                        
-                        {/* Always show if single link, otherwise show when expanded */}
-                        {(!hasMultiple || expanded) && (
-                            <div className={`flex flex-col gap-1.5 mt-2 pt-2 ${hasMultiple ? 'border-t border-slate-800/60 animate-in fade-in slide-in-from-top-1 duration-200' : ''}`}>
-                                {img.foundOn.map((pageUrl, idx) => {
-                                    let displayPath = 'Homepage';
-                                    try {
-                                        const urlObj = new URL(pageUrl);
-                                        let pName = urlObj.pathname;
-                                        if (pName.endsWith('/')) pName = pName.slice(0, -1);
-                                        if (pName && pName !== '') displayPath = pName;
-                                    } catch(e) {}
-                                    return (
-                                        <a key={idx} href={pageUrl} target="_blank" rel="noreferrer" className={`inline-flex px-2 py-1 rounded text-[10px] font-medium border truncate w-fit max-w-full transition-colors ${isTemplated ? 'bg-red-500/5 text-red-400/90 border-red-500/20 hover:bg-red-500/10 hover:text-red-300' : 'bg-emerald-500/5 text-emerald-400/90 border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-300'}`} title={`Found on: ${pageUrl}`}>
-                                            {displayPath}
-                                        </a>
-                                    );
-                                })}
-                            </div>
-                        )}
+        <section id="mainContent" class="hidden">
+            <div class="summary-dashboard">
+                <div class="stat-card blue">
+                    <h3>Total SLA GPIDs</h3>
+                    <p id="statSla">0</p>
+                </div>
+                <div class="stat-card blue">
+                    <h3>Total Freshdesk GPIDs</h3>
+                    <p id="statFd">0</p>
+                </div>
+                <div class="stat-card green">
+                    <h3>Matched</h3>
+                    <p id="statMatch">0</p>
+                </div>
+                <div class="stat-card red" id="cardMismatch">
+                    <h3>Page Count Mismatches</h3>
+                    <p id="statMismatch">0</p>
+                </div>
+                <div class="stat-card orange">
+                    <h3>Missing in SLA</h3>
+                    <p id="statMissingSla">0</p>
+                </div>
+                <div class="stat-card orange">
+                    <h3>Missing in Freshdesk</h3>
+                    <p id="statMissingFd">0</p>
+                </div>
+                <div class="stat-card blue">
+                    <h3>Accuracy %</h3>
+                    <p id="statAccuracy">0%</p>
+                </div>
+            </div>
+
+            <div id="duplicateWarning" class="warning-box hidden">
+                <h4>⚠️ Duplicate GPIDs Found</h4>
+                <p>The following GPIDs appeared multiple times. Only the first occurrence's page count was kept.</p>
+                <ul id="duplicateList"></ul>
+            </div>
+
+            <!-- Matched Table -->
+            <div class="results-section" id="sectionMatched">
+                <div class="results-header">
+                    <h2>✅ Matched Records</h2>
+                    <div class="results-actions">
+                        <button class="btn-outline" onclick="copyTable('tableMatched')">📋 Copy</button>
+                        <button class="btn-outline" onclick="exportTable('tableMatched', 'Matched_Results')">📥 CSV</button>
                     </div>
                 </div>
-            );
-        };
+                <div class="table-responsive">
+                    <table id="tableMatched">
+                        <thead>
+                            <tr>
+                                <th>GPID</th>
+                                <th>SLA Page Count</th>
+                                <th>Freshdesk Page Count</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
 
-        // --- Main Application ---
-        function App() {
-            const [builderUrl, setBuilderUrl] = useState('');
-            const [templateUrl, setTemplateUrl] = useState('');
-            const [loading, setLoading] = useState(false);
-            const [statusText, setStatusText] = useState('');
-            const [error, setError] = useState('');
-            const [results, setResults] = useState(null);
+            <!-- Mismatch Table -->
+            <div class="results-section" id="sectionMismatch">
+                <div class="results-header">
+                    <h2>❌ Page Count Mismatch</h2>
+                    <div class="results-actions">
+                        <button class="btn-outline" onclick="copyTable('tableMismatch')">📋 Copy</button>
+                        <button class="btn-outline" onclick="exportTable('tableMismatch', 'Mismatched_Results')">📥 CSV</button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table id="tableMismatch">
+                        <thead>
+                            <tr>
+                                <th>GPID</th>
+                                <th>SLA Pages</th>
+                                <th>Freshdesk Pages</th>
+                                <th>Difference</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
 
-            // Helper to extract a normalized filename from a URL
-            const getFilename = (urlStr) => {
-                try {
-                    const cleanUrl = urlStr.split('?')[0].split('#')[0];
-                    const parts = cleanUrl.split('/');
-                    let filename = parts[parts.length - 1];
-                    
-                    if (filename && filename.includes('.')) {
-                        filename = decodeURIComponent(filename).trim();
-                        
-                        // Prevent redundant image tiles by aggressively stripping CDN resizing suffixes!
-                        // Groups variants (e.g. image-1920w.jpg, image-150x150.jpg) into one clean tile.
-                        let prevFilename;
-                        do {
-                            prevFilename = filename;
-                            // Strip dimension suffixes like -150x150, _300x300, -1024xauto, -1920w, -1080h
-                            filename = filename.replace(/[-_]\d+(?:x\d+|xauto|[wh])(?=\.[a-zA-Z0-9]+$)/i, '');
-                            // Strip typical builder descriptive suffixes like -mobile, -tablet, -opt, -thumb
-                            filename = filename.replace(/[-_](?:mobile|tablet|desktop|thumb|thumbnail|small|medium|large|opt)(?=\.[a-zA-Z0-9]+$)/i, '');
-                        } while (filename !== prevFilename);
+            <!-- Missing in SLA Table -->
+            <div class="results-section" id="sectionMissingSla">
+                <div class="results-header">
+                    <h2>⚠️ Missing in SLA</h2>
+                    <div class="results-actions">
+                        <button class="btn-outline" onclick="copyTable('tableMissingSla')">📋 Copy</button>
+                        <button class="btn-outline" onclick="exportTable('tableMissingSla', 'Missing_In_SLA')">📥 CSV</button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table id="tableMissingSla">
+                        <thead>
+                            <tr>
+                                <th>GPID</th>
+                                <th>Freshdesk Pages</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
 
-                        return filename;
-                    }
-                    return null;
-                } catch (e) {
-                    return null;
+            <!-- Missing in Freshdesk Table -->
+            <div class="results-section" id="sectionMissingFd">
+                <div class="results-header">
+                    <h2>⚠️ Missing in Freshdesk</h2>
+                    <div class="results-actions">
+                        <button class="btn-outline" onclick="copyTable('tableMissingFd')">📋 Copy</button>
+                        <button class="btn-outline" onclick="exportTable('tableMissingFd', 'Missing_In_Freshdesk')">📥 CSV</button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table id="tableMissingFd">
+                        <thead>
+                            <tr>
+                                <th>GPID</th>
+                                <th>SLA Pages</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const themeBtn = document.getElementById('themeBtn');
+        const body = document.body;
+        
+        themeBtn.addEventListener('click', () => {
+            if (body.getAttribute('data-theme') === 'dark') {
+                body.removeAttribute('data-theme');
+                themeBtn.textContent = '🌙 Dark Mode';
+            } else {
+                body.setAttribute('data-theme', 'dark');
+                themeBtn.textContent = '☀️ Light Mode';
+            }
+        });
+
+        // Setup File Drag & Drop
+        function setupDropZone(textareaId) {
+            const textarea = document.getElementById(textareaId);
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                textarea.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                textarea.addEventListener(eventName, () => textarea.classList.add('dragover'), false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                textarea.addEventListener(eventName, () => textarea.classList.remove('dragover'), false);
+            });
+
+            textarea.addEventListener('drop', (e) => {
+                let dt = e.dataTransfer;
+                let files = dt.files;
+                if(files.length > 0) {
+                    let file = files[0];
+                    let reader = new FileReader();
+                    reader.onload = (event) => {
+                        textarea.value = event.target.result;
+                    };
+                    reader.readAsText(file);
                 }
-            };
+            }, false);
+        }
 
-            // Helper to fetch HTML through fallback proxies
-            const fetchProxy = async (finalUrl) => {
-                let htmlContent = '';
-                try {
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(finalUrl)}`;
-                const response = await fetch(proxyUrl);
-                if (!response.ok) throw new Error('Proxy 1 failed');
-                const data = await response.json();
-                if (!data.contents) throw new Error('Empty content');
-                htmlContent = data.contents;
-                } catch (err1) {
-                try {
-                    const fallbackUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(finalUrl)}`;
-                    const response2 = await fetch(fallbackUrl);
-                    if (!response2.ok) throw new Error('Proxy 2 failed');
-                    htmlContent = await response2.text();
-                } catch (err2) {
-                    try {
-                    const finalProxyUrl = `https://corsproxy.io/?${encodeURIComponent(finalUrl)}`;
-                    const response3 = await fetch(finalProxyUrl);
-                    if (!response3.ok) throw new Error('Proxy 3 failed');
-                    htmlContent = await response3.text();
-                    } catch (err3) {
-                    throw new Error(`Failed to fetch ${finalUrl}. Please turn off your Adblocker/Shields for this page.`);
-                    }
-                }
-                }
-                return htmlContent;
-            };
+        setupDropZone('slaInput');
+        setupDropZone('fdInput');
 
-            // Helper to process a single page's HTML to find images AND internal links
-            const extractDataFromHtml = (htmlContent, currentUrl, startUrl) => {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(htmlContent, 'text/html');
+        function parseData(text, sourceName) {
+            const lines = text.split('\n');
+            const dataMap = new Map();
+            const duplicates = [];
+            let validRows = 0;
+
+            for (let line of lines) {
+                line = line.trim();
+                if (!line) continue;
                 
-                const imagesList = [];
-                const internalLinks = [];
-                const startUrlObj = new URL(startUrl);
-
-                // PROCESS IMAGE HELPER
-                const processImageSrc = (src) => {
-                    if (!src || src.startsWith('data:')) return;
+                // Regex matches starting digits as page count, captures the rest as GPID
+                const match = line.match(/^(\d+)\s+(.+)$/);
+                if (match) {
+                    const pages = parseInt(match[1], 10);
+                    const gpid = match[2].trim();
                     
-                    let cleanSrc = src;
-                    cleanSrc = cleanSrc.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
+                    if (dataMap.has(gpid)) {
+                        dataMap.get(gpid).count++;
+                        duplicates.push(`${gpid} appears multiple times in ${sourceName}`);
+                    } else {
+                        dataMap.set(gpid, { pages, count: 1 });
+                    }
+                    validRows++;
+                }
+            }
+            return { dataMap, duplicates, validRows };
+        }
+
+        document.getElementById('compareBtn').addEventListener('click', () => {
+            // Show Loader
+            document.getElementById('mainContent').classList.add('hidden');
+            document.getElementById('loader').classList.remove('hidden');
+            document.getElementById('exportAllBtn').classList.add('hidden');
+            
+            // Allow UI to paint loader before synchronous processing
+            setTimeout(processComparison, 50);
+        });
+
+        function processComparison() {
+            const slaText = document.getElementById('slaInput').value;
+            const fdText = document.getElementById('fdInput').value;
+            const mode = document.getElementById('compareMode').value;
+
+            const slaResult = parseData(slaText, 'SLA');
+            const fdResult = parseData(fdText, 'Freshdesk');
+
+            const slaMap = slaResult.dataMap;
+            const fdMap = fdResult.dataMap;
+
+            const matched = [];
+            const mismatched = [];
+            const missingFd = [];
+            const missingSla = [];
+            const allUniqueGpids = new Set([...slaMap.keys(), ...fdMap.keys()]);
+
+            // 1. Process SLA items
+            for (let [gpid, slaData] of slaMap.entries()) {
+                if (fdMap.has(gpid)) {
+                    const fdData = fdMap.get(gpid);
                     
-                    try {
-                        const urlObj = new URL(cleanSrc, currentUrl);
-                        cleanSrc = urlObj.toString();
-                    } catch (e) { return; }
-
-                    const filename = getFilename(cleanSrc);
-                    if (filename) {
-                        imagesList.push({ src: cleanSrc, filename, foundOn: currentUrl });
-                    }
-                };
-
-                // --- 1. EXTRACT LINKS & LIGHTBOX GALLERIES ---
-                const processHref = (href) => {
-                    if (!href || href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('#')) return;
-                    
-                    // IF href is actually an image (Lightbox gallery popup link)
-                    if (href.match(/\.(jpeg|jpg|gif|png|svg|webp)(?:\?.*)?$/i)) {
-                        processImageSrc(href);
-                        return;
-                    }
-
-                    try {
-                        const linkUrlObj = new URL(href, currentUrl);
-                        if (linkUrlObj.hostname !== startUrlObj.hostname) return;
-                        
-                        const searchParams = new URLSearchParams(linkUrlObj.search);
-                        const startParams = new URLSearchParams(startUrlObj.search);
-                        startParams.forEach((value, key) => {
-                            if (!searchParams.has(key)) searchParams.set(key, value);
-                        });
-                        linkUrlObj.search = searchParams.toString();
-                        linkUrlObj.hash = '';
-                        internalLinks.push(linkUrlObj.toString());
-                    } catch (e) {}
-                };
-
-                // Standard a-tag links
-                doc.querySelectorAll('a[href]').forEach(a => processHref(a.getAttribute('href')));
-
-                // Builder specific links (dropdowns, dead-link wrappers)
-                doc.querySelectorAll('[data-href], [data-url], [data-link]').forEach(el => {
-                    processHref(el.getAttribute('data-href') || el.getAttribute('data-url') || el.getAttribute('data-link'));
-                });
-
-                // --- 2. EXTRACT IMAGES (Extremely Aggressive) ---
-                
-                // Standard & Lazy Loaded images
-                doc.querySelectorAll('img, source').forEach(img => {
-                    const src = img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-original') || img.getAttribute('srcset');
-                    if (src) {
-                        const firstSrc = src.split(',')[0].trim().split(' ')[0];
-                        processImageSrc(firstSrc);
-                    }
-                });
-
-                // Scan EVERY attribute on EVERY element to prevent missing custom hidden images
-                doc.querySelectorAll('*').forEach(el => {
-                    Array.from(el.attributes).forEach(attr => {
-                        const val = attr.value;
-                        if (!val) return;
-
-                        // Check if attribute contains an inline style/url format
-                        if (val.includes('url(')) {
-                            const urls = val.match(/url\(['"]?(.*?)['"]?\)/g);
-                            if (urls) {
-                                urls.forEach(u => {
-                                    const match = u.match(/url\(['"]?(.*?)['"]?\)/);
-                                    if (match && match[1] && !match[1].startsWith('data:')) processImageSrc(match[1]);
-                                });
-                            }
-                        }
-                        
-                        // Check if the attribute value IS literally an image URL
-                        if (val.match(/\.(jpeg|jpg|gif|png|svg|webp)(?:\?.*)?$/i)) {
-                            processImageSrc(val);
-                        }
-                    });
-                });
-
-                // Internal <style> tags
-                doc.querySelectorAll('style').forEach(styleTag => {
-                    const cssText = styleTag.textContent;
-                    if (cssText) {
-                        const urls = cssText.match(/url\(['"]?(.*?)['"]?\)/g);
-                        if (urls) {
-                            urls.forEach(u => {
-                                const match = u.match(/url\(['"]?(.*?)['"]?\)/);
-                                if (match && match[1] && !match[1].startsWith('data:') && !match[1].endsWith('.woff') && !match[1].endsWith('.woff2')) {
-                                    processImageSrc(match[1]);
-                                }
+                    if (mode === 'siteEdit') {
+                        // Site Edit: Only GPID needs to exist.
+                        matched.push({ gpid, slaPages: slaData.pages, fdPages: fdData.pages, status: '✅ Match' });
+                    } else {
+                        // New Build: Exact Page Count match required.
+                        if (slaData.pages === fdData.pages) {
+                            matched.push({ gpid, slaPages: slaData.pages, fdPages: fdData.pages, status: '✅ Match' });
+                        } else {
+                            mismatched.push({ 
+                                gpid, 
+                                slaPages: slaData.pages, 
+                                fdPages: fdData.pages, 
+                                diff: Math.abs(slaData.pages - fdData.pages) 
                             });
                         }
                     }
-                });
-
-                // --- 3. BRUTE FORCE RAW HTML PARSE (For Javascript/JSON galleries & absolute/relative paths) ---
-                const rawUrlRegex = /(?:https?:\/\/|\/)[^\s"',;<>()[\]]+\.(?:jpg|jpeg|png|gif|webp|svg)(?:\?[^\s"',;<>()[\]]+)?/gi;
-                const rawMatches = htmlContent.match(rawUrlRegex);
-                if (rawMatches) {
-                    rawMatches.forEach(url => processImageSrc(url));
+                } else {
+                    missingFd.push({ gpid, slaPages: slaData.pages });
                 }
+            }
 
-                return { images: imagesList, links: [...new Set(internalLinks)] };
-            };
-
-            // FULL SITE CRAWLER: Uses a dynamic deep-dive queue to explore links found on subpages
-            const crawlSiteAndExtractImages = async (startUrl, siteLabel) => {
-                let finalStartUrl = startUrl;
-                if (!/^https?:\/\//i.test(finalStartUrl)) {
-                    finalStartUrl = 'https://' + finalStartUrl;
+            // 2. Process remaining Freshdesk items (Missing in SLA)
+            for (let [gpid, fdData] of fdMap.entries()) {
+                if (!slaMap.has(gpid)) {
+                    missingSla.push({ gpid, fdPages: fdData.pages });
                 }
+            }
 
-                const allImages = [];
-                const visited = new Set();
-                const queue = [finalStartUrl];
-                const maxPages = 40; // Deep crawl limit
-                const batchSize = 5;
+            // Calculations
+            const totalMatchedGpids = matched.length + (mode === 'newBuild' ? mismatched.length : 0); 
+            // Total matches conceptually logic: if it exists in both, it's considered matched GPID for accuracy context
+            // But strict business logic means exact match. Let's use exact matched count for accuracy.
+            let accuracy = allUniqueGpids.size === 0 ? 0 : (matched.length / allUniqueGpids.size) * 100;
 
-                const prioritizeKeywords = ['service', 'services', 'gallery', 'portfolio', 'about', 'our-work'];
+            // Combine duplicates
+            const allDuplicates = [...slaResult.duplicates, ...fdResult.duplicates];
 
-                // Continue scanning as long as there are pages in the queue (up to the limit)
-                while (queue.length > 0 && visited.size < maxPages) {
-                    const currentBatch = [];
-                    // Take the next batch of unvisited pages
-                    while (queue.length > 0 && currentBatch.length < batchSize && visited.size + currentBatch.length < maxPages) {
-                        const url = queue.shift();
-                        if (!visited.has(url)) {
-                            visited.add(url);
-                            currentBatch.push(url);
-                        }
-                    }
+            // Update Dashboard
+            document.getElementById('statSla').textContent = slaMap.size;
+            document.getElementById('statFd').textContent = fdMap.size;
+            document.getElementById('statMatch').textContent = matched.length;
+            document.getElementById('statMismatch').textContent = mismatched.length;
+            document.getElementById('statMissingSla').textContent = missingSla.length;
+            document.getElementById('statMissingFd').textContent = missingFd.length;
+            document.getElementById('statAccuracy').textContent = accuracy.toFixed(1) + '%';
 
-                    if (currentBatch.length === 0) break;
+            // Toggle Mismatch UI based on mode
+            const mismatchSection = document.getElementById('sectionMismatch');
+            const cardMismatch = document.getElementById('cardMismatch');
+            if (mode === 'siteEdit') {
+                mismatchSection.classList.add('hidden');
+                cardMismatch.classList.add('hidden');
+            } else {
+                mismatchSection.classList.remove('hidden');
+                cardMismatch.classList.remove('hidden');
+            }
 
-                    setStatusText(`Scanning ${siteLabel}: Crawled ${visited.size} pages...`);
+            // Show Duplicate Warnings
+            const dupBox = document.getElementById('duplicateWarning');
+            if (allDuplicates.length > 0) {
+                dupBox.classList.remove('hidden');
+                document.getElementById('duplicateList').innerHTML = allDuplicates.map(d => `<li>${d}</li>`).join('');
+            } else {
+                dupBox.classList.add('hidden');
+            }
 
-                    // Fetch the batch of pages simultaneously
-                    const batchPromises = currentBatch.map(async (url) => {
-                        try {
-                            const html = await fetchProxy(url);
-                            return extractDataFromHtml(html, url, finalStartUrl);
-                        } catch (err) {
-                            return { images: [], links: [] }; 
-                        }
-                    });
+            // Render Tables
+            renderTable('tableMatched', matched, row => `
+                <tr>
+                    <td>${row.gpid}</td>
+                    <td>${row.slaPages}</td>
+                    <td>${row.fdPages}</td>
+                    <td><span class="status-badge badge-success">${row.status}</span></td>
+                </tr>
+            `);
 
-                    const batchResults = await Promise.all(batchPromises);
+            renderTable('tableMismatch', mismatched, row => `
+                <tr>
+                    <td>${row.gpid}</td>
+                    <td>${row.slaPages}</td>
+                    <td>${row.fdPages}</td>
+                    <td class="text-red">${row.diff}</td>
+                </tr>
+            `);
 
-                    // Add extracted images and queue up newly discovered links
-                    batchResults.forEach(({ images, links }) => {
-                        allImages.push(...images);
-                        
-                        links.forEach(link => {
-                            if (!visited.has(link) && !queue.includes(link)) {
-                                queue.push(link);
-                            }
-                        });
-                    });
+            renderTable('tableMissingSla', missingSla, row => `
+                <tr>
+                    <td>${row.gpid}</td>
+                    <td>${row.fdPages}</td>
+                </tr>
+            `);
 
-                    // Sort the queue to always prioritize scanning services & galleries first
-                    queue.sort((a, b) => {
-                        const aStr = a.toLowerCase();
-                        const bStr = b.toLowerCase();
-                        const aMatch = prioritizeKeywords.some(k => aStr.includes(k));
-                        const bMatch = prioritizeKeywords.some(k => bStr.includes(k));
-                        
-                        if (aMatch && !bMatch) return -1;
-                        if (!aMatch && bMatch) return 1;
-                        return 0;
-                    });
-                }
+            renderTable('tableMissingFd', missingFd, row => `
+                <tr>
+                    <td>${row.gpid}</td>
+                    <td>${row.slaPages}</td>
+                </tr>
+            `);
 
-                // Group by filename and collect all unique URLs where the image was found
-                // Deduplicate based on the pathname so we don't get duplicate buttons for the exact same page
-                const imageMap = new Map();
-                allImages.forEach(item => {
-                    let pathKey = 'Homepage';
-                    try {
-                        const urlObj = new URL(item.foundOn);
-                        let pName = urlObj.pathname;
-                        if (pName.endsWith('/')) pName = pName.slice(0, -1);
-                        if (pName && pName !== '') pathKey = pName;
-                    } catch(e) {}
-
-                    if (!imageMap.has(item.filename)) {
-                        const foundOnMap = new Map();
-                        foundOnMap.set(pathKey, item.foundOn);
-                        
-                        imageMap.set(item.filename, {
-                            src: item.src,
-                            filename: item.filename,
-                            foundOnMap: foundOnMap
-                        });
-                    } else {
-                        imageMap.get(item.filename).foundOnMap.set(pathKey, item.foundOn);
-                    }
-                });
-
-                const uniqueImages = Array.from(imageMap.values()).map(img => {
-                    const foundUrls = Array.from(img.foundOnMap.values());
-                    delete img.foundOnMap;
-                    return {
-                        ...img,
-                        foundOn: foundUrls
-                    };
-                });
-                
-                return uniqueImages;
-            };
-
-            const handleScan = async (e) => {
-                e.preventDefault();
-                if (!builderUrl || !templateUrl) {
-                    setError('Please provide both URLs.');
-                    return;
-                }
-
-                setLoading(true);
-                setError('');
-                setResults(null);
-
-                try {
-                    const builderImages = await crawlSiteAndExtractImages(builderUrl, 'Builder Site');
-                    const templateImages = await crawlSiteAndExtractImages(templateUrl, 'Template Site');
-                    
-                    setStatusText('Comparing filenames across all pages...');
-
-                    const templateFilenames = new Set(templateImages.map(img => img.filename));
-                    const templated = builderImages.filter(img => templateFilenames.has(img.filename));
-                    const uniqueToBuilder = builderImages.filter(img => !templateFilenames.has(img.filename));
-
-                    setResults({
-                        builderCount: builderImages.length,
-                        templateCount: templateImages.length,
-                        templated,
-                        uniqueToBuilder,
-                    });
-
-                } catch (err) {
-                    setError(err.message || 'An error occurred while scanning. Ensure adblockers are disabled for this site.');
-                } finally {
-                    setLoading(false);
-                    setStatusText('');
-                }
-            };
-
-            return (
-                <div className="min-h-screen font-sans p-6">
-                <div className="max-w-4xl mx-auto space-y-8">
-                    
-                    {/* Header Section */}
-                    <div className="bg-[#151c2c] rounded-2xl shadow-2xl border border-slate-800/60 p-8 relative overflow-hidden">
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-24 bg-cyan-500/10 blur-[60px] pointer-events-none"></div>
-
-                    <div className="flex flex-col items-center text-center mb-8 relative z-10">
-                        <div className="p-3 bg-cyan-400/10 text-cyan-400 rounded-xl shadow-[0_0_20px_rgba(34,211,238,0.2)] mb-4 border border-cyan-400/20">
-                        <ImageIcon size={28} />
-                        </div>
-                        <h1 className="text-3xl font-bold text-white mb-2">Templated Image Finder</h1>
-                        <p className="text-slate-400 max-w-2xl text-sm">
-                        Fast scan to compare all pages, standard images, background images, and hidden galleries. Made by JSB
-                        </p>
-                    </div>
-
-                    {/* Form */}
-                    <form onSubmit={handleScan} className="mt-8 space-y-6 relative z-10">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <label className="block text-sm font-medium text-slate-300">Builder Link</label>
-                            <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <LinkIcon size={16} className="text-slate-500" />
-                            </div>
-                            <input
-                                type="text"
-                                value={builderUrl}
-                                onChange={(e) => setBuilderUrl(e.target.value)}
-                                placeholder="Paste the builder link here..."
-                                className="pl-10 w-full rounded-xl bg-[#0f1524] border border-slate-700/50 px-4 py-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all outline-none"
-                                required
-                            />
-                            </div>
-                        </div>
-                        
-                        <div className="space-y-2">
-                            <label className="block text-sm font-medium text-slate-300">Template Link</label>
-                            <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <LinkIcon size={16} className="text-slate-500" />
-                            </div>
-                            <input
-                                type="text"
-                                value={templateUrl}
-                                onChange={(e) => setTemplateUrl(e.target.value)}
-                                placeholder="Paste the template link here..."
-                                className="pl-10 w-full rounded-xl bg-[#0f1524] border border-slate-700/50 px-4 py-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all outline-none"
-                                required
-                            />
-                            </div>
-                        </div>
-                        </div>
-
-                        {error && (
-                        <div className="p-4 bg-red-950/30 border border-red-900/50 text-red-400 rounded-xl flex items-start space-x-3">
-                            <AlertCircle size={20} className="mt-0.5 flex-shrink-0" />
-                            <p className="text-sm">{error}</p>
-                        </div>
-                        )}
-
-                        <div className="flex flex-col md:flex-row items-center gap-4 pt-2">
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full md:w-auto px-8 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-medium rounded-xl shadow-[0_0_15px_rgba(8,145,178,0.3)] transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:bg-slate-800 disabled:text-slate-400 disabled:shadow-none disabled:cursor-not-allowed"
-                        >
-                            {loading ? (
-                            <React.Fragment>
-                                <Loader2 size={18} className="animate-spin" />
-                                <span>Fast Scanning...</span>
-                            </React.Fragment>
-                            ) : (
-                            <React.Fragment>
-                                <Search size={18} />
-                                <span>Find Templated Images</span>
-                            </React.Fragment>
-                            )}
-                        </button>
-                        
-                        {/* Live Status Indicator */}
-                        {statusText && (
-                            <div className="flex items-center space-x-2 text-sm font-medium text-cyan-400 bg-cyan-950/30 px-4 py-3 rounded-xl animate-pulse border border-cyan-900/50">
-                            <Loader2 size={16} className="animate-spin" />
-                            <span>{statusText}</span>
-                            </div>
-                        )}
-                        </div>
-                    </form>
-                    </div>
-
-                    {/* Focused Results Section */}
-                    {results && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        
-                        {/* KPI Cards */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="bg-[#151c2c] p-5 rounded-2xl border border-red-900/30 flex flex-col justify-center items-center text-center shadow-lg relative overflow-hidden group">
-                            <div className="absolute inset-0 bg-gradient-to-b from-red-500/5 to-transparent pointer-events-none"></div>
-                            <p className="text-[11px] text-red-400/80 font-bold uppercase tracking-wider mb-1 relative z-10">Templated</p>
-                            <span className="text-4xl font-black text-red-500 relative z-10">{results.templated.length}</span>
-                            <p className="text-[10px] text-red-500/60 mt-1 relative z-10">To replace</p>
-                        </div>
-                        
-                        <div className="bg-[#151c2c] p-5 rounded-2xl border border-emerald-900/30 flex flex-col justify-center items-center text-center shadow-lg relative overflow-hidden">
-                            <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent pointer-events-none"></div>
-                            <p className="text-[11px] text-emerald-400/80 font-bold uppercase tracking-wider mb-1 relative z-10">Custom</p>
-                            <span className="text-4xl font-black text-emerald-500 relative z-10">{results.uniqueToBuilder.length}</span>
-                            <p className="text-[10px] text-emerald-500/60 mt-1 relative z-10">Not templated</p>
-                        </div>
-
-                        <div className="bg-[#151c2c] p-5 rounded-2xl border border-slate-800 flex flex-col justify-center items-center text-center shadow-lg">
-                            <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wider mb-1">Builder Total</p>
-                            <span className="text-4xl font-black text-white">{results.builderCount}</span>
-                            <p className="text-[10px] text-slate-500 mt-1">Images scanned</p>
-                        </div>
-
-                        <div className="bg-[#151c2c] p-5 rounded-2xl border border-slate-800 flex flex-col justify-center items-center text-center shadow-lg">
-                            <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wider mb-1">Template Total</p>
-                            <span className="text-4xl font-black text-white">{results.templateCount}</span>
-                            <p className="text-[10px] text-slate-500 mt-1">Images scanned</p>
-                        </div>
-                        </div>
-
-                        {/* Split Lists: Templated vs Custom */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        
-                        {/* Templated Images List (RED) */}
-                        <div className="bg-[#151c2c] rounded-2xl shadow-xl border border-slate-800 overflow-hidden flex flex-col">
-                            <div className="bg-[#0f1524] p-4 border-b border-slate-800/60 flex items-center justify-between">
-                            <h3 className="font-semibold text-slate-200 flex items-center text-sm">
-                                <ImageIcon size={16} className="mr-2 text-red-500" /> 
-                                Templated Images
-                            </h3>
-                            <span className="px-2.5 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded-full text-xs font-bold shadow-sm">
-                                {results.templated.length}
-                            </span>
-                            </div>
-                            
-                            <div className="p-4 max-h-[700px] overflow-y-auto bg-[#0B1120] flex-1 custom-scroll">
-                            {results.templated.length === 0 ? (
-                                <div className="text-center py-12 bg-[#151c2c] rounded-xl border border-dashed border-slate-700">
-                                <CheckCircle size={36} className="mx-auto text-emerald-500 mb-3 opacity-80" />
-                                <h4 className="text-sm font-bold text-slate-200">Site is fully custom!</h4>
-                                <p className="text-xs text-slate-500 mt-1">No matching filenames found.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                {results.templated.map((img, i) => (
-                                    <ImageCard key={i} img={img} isTemplated={true} />
-                                ))}
-                                </div>
-                            )}
-                            </div>
-                        </div>
-
-                        {/* Custom Images List (GREEN) */}
-                        <div className="bg-[#151c2c] rounded-2xl shadow-xl border border-slate-800 overflow-hidden flex flex-col">
-                            <div className="bg-[#0f1524] p-4 border-b border-slate-800/60 flex items-center justify-between">
-                            <h3 className="font-semibold text-slate-200 flex items-center text-sm">
-                                <CheckCircle size={16} className="mr-2 text-emerald-500" /> 
-                                Custom Images
-                            </h3>
-                            <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-xs font-bold shadow-sm">
-                                {results.uniqueToBuilder.length}
-                            </span>
-                            </div>
-                            
-                            <div className="p-4 max-h-[700px] overflow-y-auto bg-[#0B1120] flex-1 custom-scroll">
-                            {results.uniqueToBuilder.length === 0 ? (
-                                <div className="text-center py-12 bg-[#151c2c] rounded-xl border border-dashed border-slate-700">
-                                <AlertTriangle size={36} className="mx-auto text-yellow-500 mb-3 opacity-80" />
-                                <h4 className="text-sm font-bold text-slate-200">No custom images</h4>
-                                <p className="text-xs text-slate-500 mt-1">All images appear to be from the template.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                {results.uniqueToBuilder.map((img, i) => (
-                                    <ImageCard key={i} img={img} isTemplated={false} />
-                                ))}
-                                </div>
-                            )}
-                            </div>
-                        </div>
-
-                        </div>
-                    </div>
-                    )}
-
-                </div>
-                </div>
-            );
+            // Reveal UI
+            document.getElementById('loader').classList.add('hidden');
+            document.getElementById('mainContent').classList.remove('hidden');
+            document.getElementById('exportAllBtn').classList.remove('hidden');
+            
+            // Clear Search
+            document.getElementById('searchInput').value = '';
+            filterTables('');
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        function renderTable(tableId, data, rowTemplate) {
+            const tbody = document.querySelector(`#${tableId} tbody`);
+            if (data.length === 0) {
+                const cols = document.querySelector(`#${tableId} thead tr`).children.length;
+                tbody.innerHTML = `<tr><td colspan="${cols}" style="text-align:center; color:var(--text-muted);">No records found.</td></tr>`;
+            } else {
+                tbody.innerHTML = data.map(rowTemplate).join('');
+            }
+        }
+
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            filterTables(e.target.value.toLowerCase());
+        });
+
+        function filterTables(query) {
+            const tables = ['tableMatched', 'tableMismatch', 'tableMissingSla', 'tableMissingFd'];
+            
+            tables.forEach(tableId => {
+                const rows = document.querySelectorAll(`#${tableId} tbody tr`);
+                let visibleCount = 0;
+                
+                rows.forEach(row => {
+                    // Skip 'No records' placeholder
+                    if(row.cells.length === 1 && row.cells[0].colSpan > 1) return; 
+
+                    const gpid = row.cells[0].textContent.toLowerCase();
+                    if (gpid.includes(query)) {
+                        row.classList.remove('hidden');
+                        visibleCount++;
+                    } else {
+                        row.classList.add('hidden');
+                    }
+                });
+            });
+        }
+
+        function copyTable(tableId) {
+            const table = document.getElementById(tableId);
+            const rows = table.querySelectorAll('tr:not(.hidden)');
+            let text = [];
+            
+            rows.forEach(row => {
+                if(row.cells.length === 1 && row.cells[0].colSpan > 1) return; // Skip empty message
+                let rowData = [];
+                for(let cell of row.cells) {
+                    rowData.push(cell.textContent.trim());
+                }
+                text.push(rowData.join('\t'));
+            });
+
+            const content = text.join('\n');
+            if (!content) return;
+
+            // Use execCommand per prompt requirement for iframe compatibility
+            const textarea = document.createElement('textarea');
+            textarea.value = content;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showMessage("Copied visible rows to clipboard!");
+            } catch (err) {
+                showMessage("Failed to copy.", true);
+            }
+            document.body.removeChild(textarea);
+        }
+
+        function exportTable(tableId, filename) {
+            const table = document.getElementById(tableId);
+            const rows = table.querySelectorAll('tr:not(.hidden)');
+            let csvContent = "data:text/csv;charset=utf-8,";
+            
+            rows.forEach(row => {
+                if(row.cells.length === 1 && row.cells[0].colSpan > 1) return;
+                let rowData = [];
+                for(let cell of row.cells) {
+                    // Escape quotes for CSV
+                    rowData.push(`"${cell.textContent.trim().replace(/"/g, '""')}"`);
+                }
+                csvContent += rowData.join(',') + "\r\n";
+            });
+
+            triggerDownload(csvContent, `${filename}.csv`);
+        }
+
+        document.getElementById('exportAllBtn').addEventListener('click', () => {
+            let csvContent = "data:text/csv;charset=utf-8,";
+            const tables = [
+                { id: 'tableMatched', name: 'Matched Records' },
+                { id: 'tableMismatch', name: 'Page Count Mismatch' },
+                { id: 'tableMissingSla', name: 'Missing in SLA' },
+                { id: 'tableMissingFd', name: 'Missing in Freshdesk' }
+            ];
+
+            tables.forEach(t => {
+                // Skip mismatch if in site Edit
+                if (t.id === 'tableMismatch' && document.getElementById('compareMode').value === 'siteEdit') return;
+
+                const table = document.getElementById(t.id);
+                const rows = table.querySelectorAll('tr:not(.hidden)');
+                
+                // Add header for section
+                csvContent += `\r\n--- ${t.name} ---\r\n`;
+
+                rows.forEach(row => {
+                    if(row.cells.length === 1 && row.cells[0].colSpan > 1) return;
+                    let rowData = [];
+                    for(let cell of row.cells) {
+                        rowData.push(`"${cell.textContent.trim().replace(/"/g, '""')}"`);
+                    }
+                    csvContent += rowData.join(',') + "\r\n";
+                });
+            });
+
+            triggerDownload(csvContent, "All_Comparison_Results.csv");
+        });
+
+        function triggerDownload(content, filename) {
+            const encodedUri = encodeURI(content);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function showMessage(msg, isError = false) {
+            // Remove existing alert if any
+            const existing = document.getElementById('customAlert');
+            if(existing) document.body.removeChild(existing);
+
+            const alertBox = document.createElement('div');
+            alertBox.id = 'customAlert';
+            Object.assign(alertBox.style, {
+                position: 'fixed',
+                bottom: '20px',
+                right: '20px',
+                backgroundColor: isError ? 'var(--danger)' : 'var(--success)',
+                color: '#fff',
+                padding: '1rem 1.5rem',
+                borderRadius: 'var(--radius)',
+                boxShadow: 'var(--shadow)',
+                zIndex: '9999',
+                opacity: '0',
+                transition: 'opacity 0.3s ease-in-out'
+            });
+            alertBox.textContent = msg;
+            document.body.appendChild(alertBox);
+
+            // Fade in
+            setTimeout(() => alertBox.style.opacity = '1', 10);
+            
+            // Fade out and remove
+            setTimeout(() => {
+                alertBox.style.opacity = '0';
+                setTimeout(() => {
+                    if (alertBox.parentNode) {
+                        document.body.removeChild(alertBox);
+                    }
+                }, 300);
+            }, 3000);
+        }
     </script>
 </body>
 </html>
