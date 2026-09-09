@@ -122,6 +122,36 @@
             );
         };
 
+        // --- Small thumbnail + filename cell used in the comparison table ---
+        const ThumbCell = ({ img }) => {
+            if (!img) return <span className="text-slate-600 text-xs">—</span>;
+            return (
+                <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-9 h-9 flex-shrink-0 bg-[#0f1524] rounded-md overflow-hidden border border-slate-800/60">
+                        <img src={img.src} alt={img.filename} className="w-full h-full object-cover opacity-90" onError={(e) => { e.target.style.visibility = 'hidden'; }} />
+                    </div>
+                    <a href={img.src} target="_blank" rel="noreferrer" className="text-[11px] text-slate-300 hover:text-cyan-400 truncate max-w-[140px]" title={img.filename}>
+                        {img.filename}
+                    </a>
+                </div>
+            );
+        };
+
+        const statusBadgeClasses = (status) => {
+            switch (status) {
+                case 'TEMPLATE — EXACT': return 'bg-red-500/10 text-red-400 border-red-500/30';
+                case 'TEMPLATE — RENAMED': return 'bg-orange-500/10 text-orange-400 border-orange-500/30';
+                case 'TEMPLATE — MODIFIED': return 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+                case 'CUSTOM — REPLACED': return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30';
+                case 'MISSING': return 'bg-slate-500/10 text-slate-400 border-slate-500/30';
+                case 'NEW CUSTOM IMAGE': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+                case 'UNCERTAIN': return 'bg-purple-500/10 text-purple-400 border-purple-500/30';
+                default: return 'bg-slate-500/10 text-slate-400 border-slate-500/30';
+            }
+        };
+
+        const STATUS_CATEGORIES = ['TEMPLATE — EXACT', 'TEMPLATE — RENAMED', 'TEMPLATE — MODIFIED', 'CUSTOM — REPLACED', 'MISSING', 'NEW CUSTOM IMAGE', 'UNCERTAIN'];
+
         // --- Main Application ---
         function App() {
             const [builderUrl, setBuilderUrl] = useState('');
@@ -160,6 +190,240 @@
                 } catch (e) {
                     return null;
                 }
+            };
+
+            // ============================================================
+            // FUZZY FILENAME MATCHING
+            // Reduces a filename to a bag of meaningful tokens, stripping the
+            // extension and generic noise words builders/CMSs commonly add
+            // (final, new, v2, copy, edited, optimized...) so "team.jpg" and
+            // "team-final-v2.webp" are recognized as likely the same asset
+            // even though nothing about them matches literally.
+            // ============================================================
+            const NOISE_TOKENS = new Set(['final', 'new', 'old', 'copy', 'edited', 'edit', 'updated', 'update', 'revised', 'revision', 'draft', 'output', 'optimized', 'optimised', 'compressed', 'resized', 'scaled', 'backup', 'v1', 'v2', 'v3', 'v4', 'min', 'web', 'image', 'img', 'photo', 'picture', 'file']);
+
+            const coreTokens = (filename) => {
+                if (!filename) return [];
+                const noExt = filename.replace(/\.[a-zA-Z0-9]+$/, '');
+                const raw = noExt.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+                if (!raw) return [];
+                return raw.split(' ').filter(t => t && !NOISE_TOKENS.has(t) && !/^\d+$/.test(t));
+            };
+
+            const coreTokenKey = (filename) => coreTokens(filename).sort().join(' ');
+
+            // Simple Levenshtein distance for near-miss string comparison
+            const levenshtein = (a, b) => {
+                if (a === b) return 0;
+                if (!a.length) return b.length;
+                if (!b.length) return a.length;
+                const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+                for (let i = 1; i <= a.length; i++) {
+                    let cur = [i];
+                    for (let j = 1; j <= b.length; j++) {
+                        cur[j] = a[i - 1] === b[j - 1]
+                            ? prev[j - 1]
+                            : 1 + Math.min(prev[j - 1], prev[j], cur[j - 1]);
+                    }
+                    prev.splice(0, prev.length, ...cur);
+                }
+                return prev[b.length];
+            };
+
+            // Jaccard similarity between two filenames' token sets, with a
+            // Levenshtein-based fallback for single-token names ("hero.jpg" vs
+            // "banner.jpg") where token-set overlap alone can't discriminate.
+            const filenameSimilarity = (fileA, fileB) => {
+                const tokensA = coreTokens(fileA);
+                const tokensB = coreTokens(fileB);
+                if (tokensA.length === 0 || tokensB.length === 0) return 0;
+                const setA = new Set(tokensA);
+                const setB = new Set(tokensB);
+                const intersection = [...setA].filter(t => setB.has(t)).length;
+                const union = new Set([...setA, ...setB]).size;
+                const jaccard = union === 0 ? 0 : intersection / union;
+
+                const strA = tokensA.join('');
+                const strB = tokensB.join('');
+                const maxLen = Math.max(strA.length, strB.length) || 1;
+                const editSim = 1 - (levenshtein(strA, strB) / maxLen);
+
+                return Math.max(jaccard, editSim * 0.85);
+            };
+
+            // ============================================================
+            // PERCEPTUAL IMAGE HASHING (dHash)
+            // Loads an image directly in the browser (not through a proxy —
+            // plain <img> loads aren't subject to fetch()'s CORS restrictions,
+            // and if the user is logged into a gated preview site, the
+            // browser's own session cookies are sent automatically). If the
+            // image host allows cross-origin pixel reads we compute a 64-bit
+            // difference hash; if not (tainted canvas) we still recover the
+            // real rendered dimensions and fall back to metadata-only
+            // comparison for that image.
+            // ============================================================
+            const computeImageSignature = (url, timeoutMs = 8000) => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    let settled = false;
+                    const finish = (val) => { if (!settled) { settled = true; resolve(val); } };
+                    const timer = setTimeout(() => finish({ hash: null, width: null, height: null }), timeoutMs);
+
+                    img.onload = () => {
+                        clearTimeout(timer);
+                        const width = img.naturalWidth || null;
+                        const height = img.naturalHeight || null;
+                        try {
+                            const w = 9, h = 8;
+                            const canvas = document.createElement('canvas');
+                            canvas.width = w; canvas.height = h;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, w, h);
+                            const data = ctx.getImageData(0, 0, w, h).data; // throws if tainted
+                            const gray = [];
+                            for (let i = 0; i < data.length; i += 4) {
+                                gray.push(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+                            }
+                            let bits = '';
+                            for (let row = 0; row < h; row++) {
+                                for (let col = 0; col < w - 1; col++) {
+                                    bits += gray[row * w + col] > gray[row * w + col + 1] ? '1' : '0';
+                                }
+                            }
+                            let hex = '';
+                            for (let i = 0; i < bits.length; i += 4) {
+                                hex += parseInt(bits.substr(i, 4).padEnd(4, '0'), 2).toString(16);
+                            }
+                            finish({ hash: hex, width, height });
+                        } catch (e) {
+                            finish({ hash: null, width, height }); // cross-origin pixel read blocked
+                        }
+                    };
+                    img.onerror = () => { clearTimeout(timer); finish({ hash: null, width: null, height: null }); };
+                    img.src = url;
+                });
+            };
+
+            const hammingDistanceHex = (h1, h2) => {
+                if (!h1 || !h2 || h1.length !== h2.length) return null;
+                let dist = 0;
+                for (let i = 0; i < h1.length; i++) {
+                    const xor = parseInt(h1[i], 16) ^ parseInt(h2[i], 16);
+                    dist += (xor & 1) + ((xor >> 1) & 1) + ((xor >> 2) & 1) + ((xor >> 3) & 1);
+                }
+                return dist; // out of 64 bits total
+            };
+
+            // Runs `fn` over `items` with at most `limit` in flight at once —
+            // hashing 100+ images at full concurrency would hammer the image
+            // hosts and the browser's connection pool.
+            const mapWithConcurrency = async (items, limit, fn) => {
+                const results = new Array(items.length);
+                let nextIndex = 0;
+                const worker = async () => {
+                    while (nextIndex < items.length) {
+                        const current = nextIndex++;
+                        results[current] = await fn(items[current], current);
+                    }
+                };
+                await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+                return results;
+            };
+
+            // ============================================================
+            // CORRESPONDING-PAGE HEURISTIC
+            // Lets us recognize that /about and /about-us (or /services and
+            // /services/web-design) likely represent "the same section" even
+            // though the URLs don't literally match, so replaced-image
+            // detection isn't limited to identical page paths.
+            // ============================================================
+            const PAGE_SYNONYMS = [
+                ['about', 'about-us', 'aboutus', 'our-story', 'who-we-are'],
+                ['contact', 'contact-us', 'contactus', 'get-in-touch'],
+                ['service', 'services', 'our-services', 'what-we-do'],
+                ['portfolio', 'gallery', 'our-work', 'work', 'projects', 'case-studies'],
+                ['blog', 'news', 'articles', 'insights'],
+                ['team', 'our-team', 'staff', 'people'],
+                ['pricing', 'plans', 'packages'],
+                ['faq', 'faqs', 'help', 'support'],
+                ['home', 'index', ''],
+            ];
+            const synonymGroupFor = (slug) => PAGE_SYNONYMS.findIndex(group => group.includes(slug));
+
+            const pathSlugs = (pathname) => {
+                if (!pathname) return [''];
+                const clean = pathname.toLowerCase().replace(/^\/|\/$/g, '');
+                return clean === '' ? [''] : clean.split('/');
+            };
+
+            const pagesCorrespond = (pathA, pathB) => {
+                if (pathA === pathB) return true;
+                const slugsA = pathSlugs(pathA);
+                const slugsB = pathSlugs(pathB);
+                const lastA = slugsA[slugsA.length - 1];
+                const lastB = slugsB[slugsB.length - 1];
+                if (lastA === lastB) return true;
+                const groupA = synonymGroupFor(lastA);
+                const groupB = synonymGroupFor(lastB);
+                if (groupA !== -1 && groupA === groupB) return true;
+                return filenameSimilarity(lastA, lastB) >= 0.6;
+            };
+
+            const pathnameOf = (fullUrl) => {
+                try {
+                    const u = new URL(fullUrl);
+                    let p = u.pathname;
+                    if (p.endsWith('/') && p !== '/') p = p.slice(0, -1);
+                    return p;
+                } catch (e) { return '/'; }
+            };
+
+            // ============================================================
+            // SITEMAP / ROBOTS.TXT DISCOVERY
+            // Finds pages that may not be linked from the visible nav so the
+            // crawler isn't limited to whatever it can click through.
+            // ============================================================
+            const discoverSitemapUrls = async (origin, siteLabel, failedPages) => {
+                const candidateSitemaps = [];
+                try {
+                    const { html } = await fetchProxy(`${origin}/robots.txt`);
+                    html.split('\n').forEach(line => {
+                        const m = line.match(/^\s*sitemap:\s*(\S+)/i);
+                        if (m) candidateSitemaps.push(m[1].trim());
+                    });
+                } catch (e) {
+                    // robots.txt is optional — not every site has one, so this isn't
+                    // logged as a scan failure, just skipped.
+                }
+                ['/sitemap.xml', '/sitemap_index.xml', '/sitemap-index.xml', '/wp-sitemap.xml'].forEach(p => {
+                    const u = `${origin}${p}`;
+                    if (!candidateSitemaps.includes(u)) candidateSitemaps.push(u);
+                });
+
+                const found = new Set();
+                const queue = [...candidateSitemaps];
+                let checked = 0;
+                const maxSitemapFetches = 8;
+                while (queue.length > 0 && checked < maxSitemapFetches) {
+                    const sUrl = queue.shift();
+                    checked++;
+                    try {
+                        const { html } = await fetchProxy(sUrl);
+                        const doc = new DOMParser().parseFromString(html, 'text/xml');
+                        if (doc.querySelector('parsererror')) continue;
+                        const locs = Array.from(doc.querySelectorAll('loc')).map(n => n.textContent.trim());
+                        if (doc.querySelector('sitemapindex')) {
+                            locs.forEach(l => { if (queue.length + checked < maxSitemapFetches) queue.push(l); });
+                        } else {
+                            locs.forEach(l => found.add(l));
+                        }
+                    } catch (e) {
+                        // Guessed default paths (sitemap.xml etc.) failing is normal
+                        // and expected for most sites — silently skip and try the next.
+                    }
+                }
+                return Array.from(found);
             };
 
             // Fetch with a hard timeout so a single hanging proxy can't stall the whole crawl
@@ -305,7 +569,7 @@
                 const startUrlObj = new URL(startUrl);
 
                 // PROCESS IMAGE HELPER
-                const processImageSrc = (src) => {
+                const processImageSrc = (src, alt) => {
                     if (!src || src.startsWith('data:')) return;
                     
                     let cleanSrc = src;
@@ -318,7 +582,7 @@
 
                     const filename = getFilename(cleanSrc);
                     if (filename) {
-                        imagesList.push({ src: cleanSrc, filename, foundOn: currentUrl });
+                        imagesList.push({ src: cleanSrc, filename, foundOn: currentUrl, alt: alt || '' });
                     }
                 };
 
@@ -378,7 +642,8 @@
                         || img.getAttribute('data-lazy-src')
                         || img.getAttribute('data-bg')
                         || img.getAttribute('data-background');
-                    if (directSrc) processImageSrc(directSrc);
+                    const altText = img.getAttribute('alt') || '';
+                    if (directSrc) processImageSrc(directSrc, altText);
                     processSrcset(img.getAttribute('srcset') || img.getAttribute('data-srcset'));
                 });
 
@@ -464,25 +729,48 @@
                 return { images: imagesList, links: [...new Set(internalLinks)], looksLikeEmptySpaShell };
             };
 
-            // FULL SITE CRAWLER: Uses a dynamic deep-dive queue to explore links found on subpages
+            // FULL SITE CRAWLER: Uses a dynamic deep-dive queue to explore links found on
+            // subpages, seeded up front with anything sitemap.xml/robots.txt reveal so
+            // pages missing from the visible nav still get scanned.
             const crawlSiteAndExtractImages = async (startUrl, siteLabel) => {
                 let finalStartUrl = startUrl;
                 if (!/^https?:\/\//i.test(finalStartUrl)) {
                     finalStartUrl = 'https://' + finalStartUrl;
                 }
+                const origin = new URL(finalStartUrl).origin;
 
                 const allImages = [];
                 const visited = new Set();
+                const discovered = new Set([finalStartUrl]); // every unique URL ever seen, even beyond the cap
                 const queue = [finalStartUrl];
-                const maxPages = 40; // Deep crawl limit
+                const maxPages = 60; // Deep crawl limit
                 const batchSize = 5;
 
                 const prioritizeKeywords = ['service', 'services', 'gallery', 'portfolio', 'about', 'our-work'];
 
-                // Collected, human-readable problems encountered along the way —
-                // surfaced in the UI instead of being swallowed into a bare 0-results.
+                // Collected problems encountered along the way, both as plain text
+                // (for logs) and as structured rows (for the Failed/Inaccessible
+                // Pages table) — surfaced in the UI instead of being swallowed into
+                // a bare 0-results.
                 const warnings = [];
+                const failedPages = [];
                 let pagesFetchedOk = 0;
+
+                setStatusText(`Checking ${siteLabel} sitemap & robots.txt...`);
+                try {
+                    const sitemapUrls = await discoverSitemapUrls(origin, siteLabel, failedPages);
+                    sitemapUrls.forEach(u => {
+                        try {
+                            if (new URL(u).origin === origin && !discovered.has(u)) {
+                                discovered.add(u);
+                                queue.push(u);
+                            }
+                        } catch (e) {}
+                    });
+                } catch (e) {
+                    // Sitemap discovery is a bonus, not a requirement — crawling via
+                    // links still proceeds normally if this fails entirely.
+                }
 
                 // Continue scanning as long as there are pages in the queue (up to the limit)
                 while (queue.length > 0 && visited.size < maxPages) {
@@ -498,7 +786,7 @@
 
                     if (currentBatch.length === 0) break;
 
-                    setStatusText(`Scanning ${siteLabel}: Crawled ${visited.size} pages...`);
+                    setStatusText(`Scanning ${siteLabel}: Crawled ${visited.size} pages (${discovered.size} discovered)...`);
 
                     // Fetch the batch of pages simultaneously
                     const batchPromises = currentBatch.map(async (url) => {
@@ -507,14 +795,17 @@
                             pagesFetchedOk++;
                             if (blocked) {
                                 warnings.push(`${siteLabel}: ${url} looks like a bot-check/CAPTCHA page (via ${proxyUsed}) — its images may be missing from results.`);
+                                failedPages.push({ site: siteLabel, url, problem: `Bot-check/CAPTCHA page detected (via ${proxyUsed})`, impact: 'Images on this page may be missing or incomplete' });
                             }
                             const result = extractDataFromHtml(html, url, finalStartUrl);
                             if (result.looksLikeEmptySpaShell) {
                                 warnings.push(`${siteLabel}: ${url} returned almost no HTML content — it's likely a JavaScript-rendered app whose images can't be seen by a static scan.`);
+                                failedPages.push({ site: siteLabel, url, problem: 'Page appears to be a JavaScript-rendered app shell with no static HTML', impact: 'Images on this page cannot be seen by a static scan' });
                             }
                             return result;
                         } catch (err) {
                             warnings.push(`${siteLabel}: Failed to scan ${url} — ${err.message}`);
+                            failedPages.push({ site: siteLabel, url, problem: err.message || 'Failed to fetch', impact: 'Page could not be scanned at all — images on it are unknown' });
                             return { images: [], links: [] };
                         }
                     });
@@ -526,6 +817,7 @@
                         allImages.push(...(images || []));
 
                         (links || []).forEach(link => {
+                            if (!discovered.has(link)) discovered.add(link);
                             if (!visited.has(link) && !queue.includes(link)) {
                                 queue.push(link);
                             }
@@ -558,7 +850,8 @@
 
                 // Group by filename (case-insensitive key, since some CDNs vary
                 // casing for what's otherwise the identical asset) and collect all
-                // unique URLs where the image was found.
+                // unique URLs where the image was found, plus a fuzzy core-token key
+                // and any alt text spotted for that asset.
                 const imageMap = new Map();
                 allImages.forEach(item => {
                     let pathKey = 'Homepage';
@@ -579,10 +872,14 @@
                             src: item.src,
                             filename: item.filename,
                             matchKey,
+                            coreKey: coreTokenKey(item.filename),
+                            alt: item.alt || '',
                             foundOnMap: foundOnMap
                         });
                     } else {
-                        imageMap.get(matchKey).foundOnMap.set(pathKey, item.foundOn);
+                        const existing = imageMap.get(matchKey);
+                        existing.foundOnMap.set(pathKey, item.foundOn);
+                        if (!existing.alt && item.alt) existing.alt = item.alt;
                     }
                 });
 
@@ -591,11 +888,178 @@
                     delete img.foundOnMap;
                     return {
                         ...img,
-                        foundOn: foundUrls
+                        foundOn: foundUrls,
+                        hash: null,
+                        width: null,
+                        height: null,
                     };
                 });
                 
-                return { images: uniqueImages, warnings, pagesScanned: visited.size };
+                return {
+                    images: uniqueImages,
+                    warnings,
+                    failedPages,
+                    discoveredCount: discovered.size,
+                    scannedCount: pagesFetchedOk,
+                    failedCount: visited.size - pagesFetchedOk,
+                };
+            };
+
+            // ============================================================
+            // TEMPLATE DETECTION ENGINE
+            // Runs filename/fuzzy/visual-hash matching between the two image
+            // sets and classifies every image into one of the required
+            // categories (TEMPLATE — EXACT/RENAMED/MODIFIED, CUSTOM — REPLACED,
+            // MISSING, NEW CUSTOM IMAGE, UNCERTAIN).
+            // ============================================================
+            const HASH_CAP_PER_SITE = 120;
+
+            const compareSites = async (builderImages, templateImages) => {
+                const toHash = [
+                    ...templateImages.slice(0, HASH_CAP_PER_SITE),
+                    ...builderImages.slice(0, HASH_CAP_PER_SITE),
+                ];
+                if (toHash.length > 0) {
+                    setStatusText(`Visually comparing ${toHash.length} images (loading + hashing)...`);
+                    await mapWithConcurrency(toHash, 8, async (img) => {
+                        const sig = await computeImageSignature(img.src);
+                        img.hash = sig.hash;
+                        img.width = sig.width;
+                        img.height = sig.height;
+                    });
+                }
+
+                setStatusText('Classifying images...');
+
+                const matchedT = new Array(templateImages.length).fill(false);
+                const matchedB = new Array(builderImages.length).fill(false);
+                const rows = [];
+
+                const pushRow = (tIdx, bIdx, status, confidence, explanation, match) => {
+                    const t = tIdx !== null && tIdx !== -1 ? templateImages[tIdx] : null;
+                    const b = bIdx !== null && bIdx !== -1 ? builderImages[bIdx] : null;
+                    rows.push({
+                        templatePage: t ? pathnameOf(t.foundOn[0]) : '—',
+                        templateImage: t,
+                        myPage: b ? pathnameOf(b.foundOn[0]) : '—',
+                        myImage: b,
+                        match,
+                        status,
+                        confidence: Math.max(0, Math.min(100, Math.round(confidence))),
+                        explanation,
+                    });
+                    if (t) matchedT[tIdx] = true;
+                    if (b) matchedB[bIdx] = true;
+                };
+
+                // PASS 1/2 — perceptual hash (actual visual content) comparison.
+                // This is the strongest evidence available and runs first,
+                // regardless of what the filenames look like.
+                builderImages.forEach((b, bIdx) => {
+                    if (matchedB[bIdx] || !b.hash) return;
+                    let bestIdx = -1, bestDist = Infinity;
+                    templateImages.forEach((t, tIdx) => {
+                        if (matchedT[tIdx] || !t.hash) return;
+                        const d = hammingDistanceHex(b.hash, t.hash);
+                        if (d !== null && d < bestDist) { bestDist = d; bestIdx = tIdx; }
+                    });
+                    if (bestIdx === -1) return;
+                    if (bestDist <= 4) {
+                        const sameName = b.matchKey === templateImages[bestIdx].matchKey;
+                        pushRow(bestIdx, bIdx,
+                            sameName ? 'TEMPLATE — EXACT' : 'TEMPLATE — RENAMED',
+                            sameName ? 99 : 96,
+                            sameName
+                                ? 'Identical filename and visually identical pixel content (verified by direct image comparison).'
+                                : 'Visually identical pixel content (verified by direct image comparison); only the filename/format changed.',
+                            'Yes');
+                    } else if (bestDist <= 16) {
+                        pushRow(bestIdx, bIdx, 'TEMPLATE — MODIFIED', Math.max(55, 92 - bestDist * 2),
+                            `Same underlying image but visually altered (pixel-hash distance ${bestDist}/64) — likely cropped, filtered, recolored, resized, or recompressed.`, 'Yes');
+                    }
+                });
+
+                // PASS 3 — exact filename / core-token match for anything not
+                // resolved visually (hash unavailable due to CORS, or too
+                // different to call a hash match).
+                builderImages.forEach((b, bIdx) => {
+                    if (matchedB[bIdx]) return;
+                    let tIdx = templateImages.findIndex((t, i) => !matchedT[i] && t.matchKey === b.matchKey);
+                    if (tIdx !== -1) {
+                        const bothHashed = !!(b.hash && templateImages[tIdx].hash);
+                        pushRow(tIdx, bIdx, 'TEMPLATE — EXACT', bothHashed ? 90 : 76,
+                            bothHashed
+                                ? 'Identical filename; hash comparison was inconclusive but names match exactly.'
+                                : 'Identical filename. Visual content could not be verified (image blocked cross-origin pixel access), so this is filename-based evidence only.',
+                            'Yes');
+                        return;
+                    }
+                    tIdx = templateImages.findIndex((t, i) => !matchedT[i] && t.coreKey && t.coreKey === b.coreKey);
+                    if (tIdx !== -1) {
+                        pushRow(tIdx, bIdx, 'TEMPLATE — RENAMED', 72,
+                            'Filename matches after stripping the extension/format and common suffixes (e.g. "-final", "-v2", "-copy") — likely the same asset renamed or re-exported.',
+                            'Yes');
+                    }
+                });
+
+                // PASS 4 — fuzzy filename similarity for whatever's left.
+                builderImages.forEach((b, bIdx) => {
+                    if (matchedB[bIdx]) return;
+                    let bestIdx = -1, bestSim = 0;
+                    templateImages.forEach((t, tIdx) => {
+                        if (matchedT[tIdx]) return;
+                        const sim = filenameSimilarity(b.filename, t.filename);
+                        if (sim > bestSim) { bestSim = sim; bestIdx = tIdx; }
+                    });
+                    if (bestIdx === -1) return;
+                    if (bestSim >= 0.72) {
+                        pushRow(bestIdx, bIdx, 'TEMPLATE — RENAMED', Math.round(48 + bestSim * 25),
+                            `Filenames are similar but not identical (~${Math.round(bestSim * 100)}% token match) — likely the same image renamed. Not visually verified.`, 'Yes');
+                    } else if (bestSim >= 0.45) {
+                        pushRow(bestIdx, bIdx, 'UNCERTAIN', Math.round(25 + bestSim * 20),
+                            `Filenames share partial similarity (~${Math.round(bestSim * 100)}% token match) — not strong enough to confirm the same image without a working visual comparison.`, 'Partial');
+                    }
+                });
+
+                // PASS 5 — remaining template images: check for a same-section
+                // replacement on the builder site before giving up as MISSING.
+                templateImages.forEach((t, tIdx) => {
+                    if (matchedT[tIdx]) return;
+                    const tPage = pathnameOf(t.foundOn[0]);
+                    const replacementIdx = builderImages.findIndex((b, bIdx) =>
+                        !matchedB[bIdx] && b.foundOn.some(f => pagesCorrespond(tPage, pathnameOf(f)))
+                    );
+                    if (replacementIdx !== -1) {
+                        pushRow(tIdx, replacementIdx, 'CUSTOM — REPLACED', 52,
+                            `No matching image found on your site, but a different image appears in what looks like the corresponding page/section (${tPage} ↔ ${pathnameOf(builderImages[replacementIdx].foundOn[0])}) — likely a direct replacement rather than a missing asset.`,
+                            'No');
+                    } else {
+                        pushRow(tIdx, null, 'MISSING', 80,
+                            'This template image was not found anywhere on your site after a full scan of all reachable pages.', 'No');
+                    }
+                });
+
+                // PASS 6 — anything left on the builder site has no template counterpart at all.
+                builderImages.forEach((b, bIdx) => {
+                    if (matchedB[bIdx]) return;
+                    pushRow(null, bIdx, 'NEW CUSTOM IMAGE', 85,
+                        'This image exists on your site but has no counterpart anywhere on the template site.', 'No');
+                });
+
+                const statusCounts = {};
+                rows.forEach(r => { statusCounts[r.status] = (statusCounts[r.status] || 0) + 1; });
+
+                const templateDerivedCount = (statusCounts['TEMPLATE — EXACT'] || 0)
+                    + (statusCounts['TEMPLATE — RENAMED'] || 0)
+                    + (statusCounts['TEMPLATE — MODIFIED'] || 0);
+                const percentage = builderImages.length > 0
+                    ? Math.round((templateDerivedCount / builderImages.length) * 100)
+                    : 0;
+
+                const statusOrder = ['TEMPLATE — EXACT', 'TEMPLATE — RENAMED', 'TEMPLATE — MODIFIED', 'CUSTOM — REPLACED', 'MISSING', 'NEW CUSTOM IMAGE', 'UNCERTAIN'];
+                rows.sort((a, b) => statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status));
+
+                return { rows, statusCounts, percentage, templateDerivedCount };
             };
 
             const handleScan = async (e) => {
@@ -616,16 +1080,10 @@
                     const builderImages = builderResult.images;
                     const templateImages = templateResult.images;
                     const warnings = [...builderResult.warnings, ...templateResult.warnings];
-
-                    setStatusText('Comparing filenames across all pages...');
-
-                    // Case-insensitive match on the normalized filename key
-                    const templateFilenames = new Set(templateImages.map(img => img.matchKey));
-                    const templated = builderImages.filter(img => templateFilenames.has(img.matchKey));
-                    const uniqueToBuilder = builderImages.filter(img => !templateFilenames.has(img.matchKey));
+                    const failedPages = [...templateResult.failedPages, ...builderResult.failedPages];
 
                     // If literally nothing was found on either site, don't just show
-                    // empty lists — tell the user why, since 0/0 usually means the
+                    // empty tables — tell the user why, since 0/0 usually means the
                     // scan itself broke rather than the sites being genuinely empty.
                     if (builderImages.length === 0 && templateImages.length === 0) {
                         const warningText = warnings.join(' ').toLowerCase();
@@ -640,15 +1098,29 @@
                         } else {
                             reason = 'This usually means the sites blocked automated fetching, render their images entirely via JavaScript, or the free CORS proxies are temporarily unavailable.';
                         }
-                        setError(`No images were found on either site after scanning all reachable pages. ${reason} Check the warnings below for the specific reason per page.`);
+                        setError(`No images were found on either site after scanning all reachable pages. ${reason} Check the Failed/Inaccessible Pages table below for the specific reason per page.`);
+                        return;
                     }
 
+                    const comparison = await compareSites(builderImages, templateImages);
+
                     setResults({
-                        builderCount: builderImages.length,
-                        templateCount: templateImages.length,
-                        templated,
-                        uniqueToBuilder,
-                        warnings,
+                        builderScan: {
+                            discovered: builderResult.discoveredCount,
+                            scanned: builderResult.scannedCount,
+                            failed: builderResult.failedCount,
+                            images: builderImages.length,
+                        },
+                        templateScan: {
+                            discovered: templateResult.discoveredCount,
+                            scanned: templateResult.scannedCount,
+                            failed: templateResult.failedCount,
+                            images: templateImages.length,
+                        },
+                        rows: comparison.rows,
+                        statusCounts: comparison.statusCounts,
+                        percentage: comparison.percentage,
+                        failedPages,
                     });
 
                 } catch (err) {
@@ -754,114 +1226,149 @@
 
                     {/* Focused Results Section */}
                     {results && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        
-                        {/* KPI Cards */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="bg-[#151c2c] p-5 rounded-2xl border border-red-900/30 flex flex-col justify-center items-center text-center shadow-lg relative overflow-hidden group">
-                            <div className="absolute inset-0 bg-gradient-to-b from-red-500/5 to-transparent pointer-events-none"></div>
-                            <p className="text-[11px] text-red-400/80 font-bold uppercase tracking-wider mb-1 relative z-10">Templated</p>
-                            <span className="text-4xl font-black text-red-500 relative z-10">{results.templated.length}</span>
-                            <p className="text-[10px] text-red-500/60 mt-1 relative z-10">To replace</p>
-                        </div>
-                        
-                        <div className="bg-[#151c2c] p-5 rounded-2xl border border-emerald-900/30 flex flex-col justify-center items-center text-center shadow-lg relative overflow-hidden">
-                            <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent pointer-events-none"></div>
-                            <p className="text-[11px] text-emerald-400/80 font-bold uppercase tracking-wider mb-1 relative z-10">Custom</p>
-                            <span className="text-4xl font-black text-emerald-500 relative z-10">{results.uniqueToBuilder.length}</span>
-                            <p className="text-[10px] text-emerald-500/60 mt-1 relative z-10">Not templated</p>
+                    <div className="space-y-8 animate-in fade-in duration-500">
+
+                        {/* 1. Website Scan Summary */}
+                        <div className="bg-[#151c2c] rounded-2xl shadow-xl border border-slate-800 overflow-hidden">
+                            <div className="bg-[#0f1524] p-4 border-b border-slate-800/60">
+                                <h3 className="font-semibold text-slate-200 text-sm">Website Scan Summary</h3>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs text-left">
+                                    <thead className="text-slate-500 uppercase text-[10px] border-b border-slate-800">
+                                        <tr>
+                                            <th className="p-3">Website</th>
+                                            <th className="p-3">Pages Discovered</th>
+                                            <th className="p-3">Pages Scanned</th>
+                                            <th className="p-3">Pages Failed</th>
+                                            <th className="p-3">Images Found</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800/60">
+                                        <tr>
+                                            <td className="p-3 font-medium text-slate-300">Template Website</td>
+                                            <td className="p-3 text-slate-300">{results.templateScan.discovered}</td>
+                                            <td className="p-3 text-slate-300">{results.templateScan.scanned}</td>
+                                            <td className="p-3 text-slate-300">{results.templateScan.failed}</td>
+                                            <td className="p-3 text-slate-300">{results.templateScan.images}</td>
+                                        </tr>
+                                        <tr>
+                                            <td className="p-3 font-medium text-slate-300">My Website</td>
+                                            <td className="p-3 text-slate-300">{results.builderScan.discovered}</td>
+                                            <td className="p-3 text-slate-300">{results.builderScan.scanned}</td>
+                                            <td className="p-3 text-slate-300">{results.builderScan.failed}</td>
+                                            <td className="p-3 text-slate-300">{results.builderScan.images}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
 
-                        <div className="bg-[#151c2c] p-5 rounded-2xl border border-slate-800 flex flex-col justify-center items-center text-center shadow-lg">
-                            <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wider mb-1">Builder Total</p>
-                            <span className="text-4xl font-black text-white">{results.builderCount}</span>
-                            <p className="text-[10px] text-slate-500 mt-1">Images scanned</p>
+                        {/* 2. Overall Template Image Usage banner */}
+                        <div className="bg-gradient-to-r from-cyan-950/40 to-[#151c2c] border border-cyan-900/40 rounded-2xl p-6 text-center">
+                            <p className="text-xs uppercase tracking-wider text-cyan-400/80 font-bold mb-2">Overall Template Image Usage</p>
+                            <p className="text-4xl font-black text-white mb-2">{results.percentage}%</p>
+                            <p className="text-sm text-slate-300 max-w-xl mx-auto">
+                                Your website still uses approximately <span className="text-cyan-400 font-semibold">{results.percentage}%</span> of the template's original imagery.
+                            </p>
+                            <p className="text-[11px] text-slate-500 mt-3 max-w-xl mx-auto leading-relaxed">
+                                Calculated as (Exact + Renamed + Modified template matches) ÷ (total images found on your site) × 100. Matches based only on filename evidence (image blocked cross-origin pixel comparison) still count toward this total, so treat it as a strong estimate rather than an exact figure.
+                            </p>
                         </div>
 
-                        <div className="bg-[#151c2c] p-5 rounded-2xl border border-slate-800 flex flex-col justify-center items-center text-center shadow-lg">
-                            <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wider mb-1">Template Total</p>
-                            <span className="text-4xl font-black text-white">{results.templateCount}</span>
-                            <p className="text-[10px] text-slate-500 mt-1">Images scanned</p>
-                        </div>
+                        {/* 3. Category breakdown cards */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {STATUS_CATEGORIES.map((label) => (
+                                <div key={label} className="bg-[#151c2c] p-4 rounded-xl border border-slate-800 text-center">
+                                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wide mb-1 leading-tight">{label}</p>
+                                    <p className="text-2xl font-black text-white">{results.statusCounts[label] || 0}</p>
+                                </div>
+                            ))}
                         </div>
 
-                        {/* Scan Warnings: surfaces per-page/proxy failures instead of a silent 0 */}
-                        {results.warnings && results.warnings.length > 0 && (
-                        <details className="bg-amber-950/20 border border-amber-900/40 rounded-xl p-4 text-amber-300 open:pb-2">
-                            <summary className="cursor-pointer font-semibold flex items-center text-sm select-none">
-                                <AlertTriangle size={14} className="mr-2 flex-shrink-0" />
-                                {results.warnings.length} issue{results.warnings.length === 1 ? '' : 's'} encountered while scanning — click to view
-                            </summary>
-                            <ul className="mt-3 space-y-1.5 list-disc list-inside max-h-56 overflow-y-auto custom-scroll pr-2">
-                                {results.warnings.map((w, i) => (
-                                    <li key={i} className="text-xs text-amber-300/80 leading-relaxed">{w}</li>
-                                ))}
-                            </ul>
-                        </details>
+                        {/* 4. Image Comparison Table */}
+                        <div className="bg-[#151c2c] rounded-2xl shadow-xl border border-slate-800 overflow-hidden">
+                            <div className="bg-[#0f1524] p-4 border-b border-slate-800/60 flex items-center justify-between">
+                                <h3 className="font-semibold text-slate-200 flex items-center text-sm">
+                                    <ImageIcon size={16} className="mr-2 text-cyan-400" />
+                                    Image Comparison
+                                </h3>
+                                <span className="px-2.5 py-0.5 bg-slate-700/30 text-slate-300 border border-slate-600/30 rounded-full text-xs font-bold">
+                                    {results.rows.length} rows
+                                </span>
+                            </div>
+                            <div className="overflow-auto max-h-[720px] custom-scroll">
+                                <table className="w-full text-xs text-left border-collapse">
+                                    <thead className="text-slate-500 uppercase text-[10px] bg-[#0f1524] sticky top-0 z-10">
+                                        <tr>
+                                            <th className="p-3">#</th>
+                                            <th className="p-3">Template Page</th>
+                                            <th className="p-3">Template Image</th>
+                                            <th className="p-3">My Page</th>
+                                            <th className="p-3">My Image</th>
+                                            <th className="p-3">Match</th>
+                                            <th className="p-3">Status</th>
+                                            <th className="p-3">Confidence</th>
+                                            <th className="p-3 min-w-[240px]">Explanation</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800/60">
+                                        {results.rows.map((row, i) => (
+                                            <tr key={i} className="hover:bg-[#0f1524]/60 align-top">
+                                                <td className="p-3 text-slate-500">{i + 1}</td>
+                                                <td className="p-3 text-slate-400 max-w-[120px] truncate" title={row.templatePage}>{row.templatePage}</td>
+                                                <td className="p-3"><ThumbCell img={row.templateImage} /></td>
+                                                <td className="p-3 text-slate-400 max-w-[120px] truncate" title={row.myPage}>{row.myPage}</td>
+                                                <td className="p-3"><ThumbCell img={row.myImage} /></td>
+                                                <td className="p-3 text-slate-400">{row.match}</td>
+                                                <td className="p-3">
+                                                    <span className={`inline-block px-2 py-0.5 rounded-full border text-[10px] font-bold whitespace-nowrap ${statusBadgeClasses(row.status)}`}>
+                                                        {row.status}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3 text-slate-300 font-semibold">{row.confidence}%</td>
+                                                <td className="p-3 text-slate-500 leading-relaxed">{row.explanation}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* 5. Failed / Inaccessible Pages */}
+                        {results.failedPages && results.failedPages.length > 0 && (
+                        <div className="bg-[#151c2c] rounded-2xl shadow-xl border border-amber-900/40 overflow-hidden">
+                            <div className="bg-[#0f1524] p-4 border-b border-slate-800/60 flex items-center">
+                                <AlertTriangle size={16} className="mr-2 text-amber-500 flex-shrink-0" />
+                                <h3 className="font-semibold text-slate-200 text-sm">Failed / Inaccessible Pages ({results.failedPages.length})</h3>
+                            </div>
+                            <div className="overflow-auto max-h-[400px] custom-scroll">
+                                <table className="w-full text-xs text-left">
+                                    <thead className="text-slate-500 uppercase text-[10px] bg-[#0f1524] sticky top-0">
+                                        <tr>
+                                            <th className="p-3">Site</th>
+                                            <th className="p-3">URL</th>
+                                            <th className="p-3">Problem</th>
+                                            <th className="p-3">Impact</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800/60">
+                                        {results.failedPages.map((fp, i) => (
+                                            <tr key={i}>
+                                                <td className="p-3 text-slate-400 whitespace-nowrap">{fp.site}</td>
+                                                <td className="p-3 text-slate-400 max-w-[220px] truncate" title={fp.url}>
+                                                    <a href={fp.url} target="_blank" rel="noreferrer" className="hover:text-cyan-400">{fp.url}</a>
+                                                </td>
+                                                <td className="p-3 text-amber-400/90">{fp.problem}</td>
+                                                <td className="p-3 text-slate-500">{fp.impact}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                         )}
 
-                        {/* Split Lists: Templated vs Custom */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        
-                        {/* Templated Images List (RED) */}
-                        <div className="bg-[#151c2c] rounded-2xl shadow-xl border border-slate-800 overflow-hidden flex flex-col">
-                            <div className="bg-[#0f1524] p-4 border-b border-slate-800/60 flex items-center justify-between">
-                            <h3 className="font-semibold text-slate-200 flex items-center text-sm">
-                                <ImageIcon size={16} className="mr-2 text-red-500" /> 
-                                Templated Images
-                            </h3>
-                            <span className="px-2.5 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded-full text-xs font-bold shadow-sm">
-                                {results.templated.length}
-                            </span>
-                            </div>
-                            
-                            <div className="p-4 max-h-[700px] overflow-y-auto bg-[#0B1120] flex-1 custom-scroll">
-                            {results.templated.length === 0 ? (
-                                <div className="text-center py-12 bg-[#151c2c] rounded-xl border border-dashed border-slate-700">
-                                <CheckCircle size={36} className="mx-auto text-emerald-500 mb-3 opacity-80" />
-                                <h4 className="text-sm font-bold text-slate-200">Site is fully custom!</h4>
-                                <p className="text-xs text-slate-500 mt-1">No matching filenames found.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                {results.templated.map((img, i) => (
-                                    <ImageCard key={i} img={img} isTemplated={true} />
-                                ))}
-                                </div>
-                            )}
-                            </div>
-                        </div>
-
-                        {/* Custom Images List (GREEN) */}
-                        <div className="bg-[#151c2c] rounded-2xl shadow-xl border border-slate-800 overflow-hidden flex flex-col">
-                            <div className="bg-[#0f1524] p-4 border-b border-slate-800/60 flex items-center justify-between">
-                            <h3 className="font-semibold text-slate-200 flex items-center text-sm">
-                                <CheckCircle size={16} className="mr-2 text-emerald-500" /> 
-                                Custom Images
-                            </h3>
-                            <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-xs font-bold shadow-sm">
-                                {results.uniqueToBuilder.length}
-                            </span>
-                            </div>
-                            
-                            <div className="p-4 max-h-[700px] overflow-y-auto bg-[#0B1120] flex-1 custom-scroll">
-                            {results.uniqueToBuilder.length === 0 ? (
-                                <div className="text-center py-12 bg-[#151c2c] rounded-xl border border-dashed border-slate-700">
-                                <AlertTriangle size={36} className="mx-auto text-yellow-500 mb-3 opacity-80" />
-                                <h4 className="text-sm font-bold text-slate-200">No custom images</h4>
-                                <p className="text-xs text-slate-500 mt-1">All images appear to be from the template.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                {results.uniqueToBuilder.map((img, i) => (
-                                    <ImageCard key={i} img={img} isTemplated={false} />
-                                ))}
-                                </div>
-                            )}
-                            </div>
-                        </div>
-
-                        </div>
                     </div>
                     )}
 
